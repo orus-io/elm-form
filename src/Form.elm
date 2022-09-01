@@ -18,6 +18,7 @@ type alias FormDef customError output sharedMsg model view =
     { validate : model -> Validation customError output
     , init : model -> Maybe output -> Form customError output
     , update : model -> Msg -> Form customError output -> ( Form customError output, Effect sharedMsg Msg )
+    , subscriptions : model -> Form customError output -> Sub Msg
     , view : model -> Form customError output -> view
     }
 
@@ -59,6 +60,9 @@ finalize (Builder { validate, view }) =
     , update =
         \model msg formdata ->
             ( update (validate model) msg formdata, Effect.none )
+    , subscriptions =
+        \_ _ ->
+            Sub.none
     , view =
         \model form ->
             view model form model

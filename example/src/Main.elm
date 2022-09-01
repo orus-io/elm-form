@@ -23,7 +23,7 @@ init flags =
 
 
 subscriptions model =
-    Sub.none
+    Sub.map LoginFormMsg <| LoginForm.form.subscriptions () model.loginForm
 
 
 update msg model =
