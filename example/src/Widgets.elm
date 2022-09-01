@@ -14,3 +14,13 @@ textInput { path, value } =
         , label = Input.labelHidden ""
         , placeholder = Nothing
         }
+
+
+checkbox : Form.FieldState customError Bool -> Element Form.Msg
+checkbox { path, value } =
+    Input.checkbox []
+        { onChange = Form.Field.Bool >> Form.Input path Form.Checkbox
+        , icon = Input.defaultCheckbox
+        , label = Input.labelHidden ""
+        , checked = value |> Maybe.withDefault False
+        }

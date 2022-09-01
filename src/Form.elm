@@ -3,7 +3,7 @@ module Form exposing (..)
 import Dict exposing (Dict)
 import Effect exposing (Effect)
 import Form.Error as Error exposing (Error, ErrorValue)
-import Form.Field as Field exposing (Field, FieldValue)
+import Form.Field as Field exposing (Field, FieldDef(..), FieldValue)
 import Form.Tree as Tree
 import Form.Validate as Validate exposing (Validation)
 import Internal
@@ -11,51 +11,72 @@ import Set exposing (Set)
 
 
 type Builder validate view model customError output
-    = Builder { validate : validate, view : model -> Form customError output -> view }
+    = Builder
+        { load : List (output -> ( String, Field ))
+        , validate : validate
+        , view : model -> Form customError output -> view
+        }
 
 
 type alias FormDef customError output sharedMsg model view =
-    { validate : model -> Validation customError output
-    , init : model -> Maybe output -> Form customError output
+    { init : model -> Maybe output -> Form customError output
     , update : model -> Msg -> Form customError output -> ( Form customError output, Effect sharedMsg Msg )
     , subscriptions : model -> Form customError output -> Sub Msg
     , view : model -> Form customError output -> view
     }
 
 
-type alias FieldDef =
-    Internal.FieldDef
+type alias FieldRef =
+    Internal.FieldRef
 
 
 init : { validate : validate, view : view } -> Builder validate view model customError output
 init { validate, view } =
     Builder
-        { validate = validate
+        { load = []
+        , validate = validate
         , view = \_ _ -> view
         }
 
 
 field :
     String
-    -> Builder (FieldDef -> validate) (FieldState customError String -> view) model customError output
+    -> FieldDef output a
+    -> Builder (FieldRef -> validate) (FieldState customError a -> view) model customError output
     -> Builder validate view model customError output
-field name (Builder { validate, view }) =
+field name (FieldDef fieldload toField toFieldValue) (Builder { validate, view, load }) =
     Builder
-        { validate = validate <| Internal.FieldDef name
+        { load =
+            case fieldload of
+                Just l ->
+                    (\d -> ( name, l d |> toField )) :: load
+
+                Nothing ->
+                    load
+        , validate = validate <| Internal.FieldRef name
         , view =
-            \model form ->
-                view model form (getFieldAsString name form)
+            \model (F formModel) ->
+                view model
+                    (F formModel)
+                    (getField (getAnyAt toFieldValue)
+                        name
+                        (F formModel)
+                    )
         }
+
+
+getAnyAt : (Field -> Maybe a) -> String -> Form e o -> Maybe a
+getAnyAt toFieldValue name (F model) =
+    getFieldAt name model |> Maybe.andThen toFieldValue
 
 
 finalize :
     Builder (model -> Validation customError output) (model -> view) model customError output
     -> FormDef customError output sharedMsg model view
-finalize (Builder { validate, view }) =
-    { validate = validate
-    , init =
+finalize (Builder { validate, view, load }) =
+    { init =
         \model ->
-            Maybe.map (\data -> initial [] <| validate model)
+            Maybe.map (\data -> initial (load |> List.map (\l -> l data)) <| validate model)
                 >> Maybe.withDefault (initial [] <| validate model)
     , update =
         \model msg formdata ->

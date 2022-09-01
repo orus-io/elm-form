@@ -45,8 +45,8 @@ import Result
 import String
 
 
-type alias FieldDef =
-    Internal.FieldDef
+type alias FieldRef =
+    Internal.FieldRef
 
 
 {-| A validation is a function that takes a form field and returns a result
@@ -134,8 +134,8 @@ customError =
     field "name" string
 
 -}
-field : FieldDef -> Validation e a -> Validation e a
-field (Internal.FieldDef key) validation validationField =
+field : FieldRef -> Validation e a -> Validation e a
+field (Internal.FieldRef key) validation validationField =
     Tree.getAtName key validationField
         |> Maybe.withDefault (Tree.Value EmptyField)
         |> validation

@@ -10,6 +10,7 @@ import Widgets
 type alias Credentials =
     { login : String
     , password : String
+    , rememberMe : Bool
     }
 
 
@@ -30,12 +31,13 @@ type alias Msg =
 form =
     Form.init
         { validate =
-            \login password _ ->
+            \login password rememberMe _ ->
                 Validate.succeed Credentials
                     |> Validate.andMap (Validate.field login Validate.string)
                     |> Validate.andMap (Validate.field password Validate.string)
+                    |> Validate.andMap (Validate.field rememberMe Validate.bool)
         , view =
-            \login password model ->
+            \login password rememberMe model ->
                 Element.column
                     [ Element.spacing 20
                     , Element.centerX
@@ -43,8 +45,16 @@ form =
                     ]
                     [ Widgets.textInput login
                     , Widgets.textInput password
+                    , Widgets.checkbox rememberMe
                     ]
         }
         |> Form.field "login"
+            (Field.text
+                |> Field.withInitialValue .login
+            )
         |> Form.field "password"
+            (Field.text
+                |> Field.withInitialValue .password
+            )
+        |> Form.field "remember-me" Field.boolean
         |> Form.finalize

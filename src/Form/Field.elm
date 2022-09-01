@@ -1,6 +1,7 @@
 module Form.Field exposing
     ( Field, FieldValue(..), value, string, bool, group, list
     , asString, asBool
+    , FieldDef(..), boolean, text, withInitialValue
     )
 
 {-| Read and write field values.
@@ -18,6 +19,25 @@ module Form.Field exposing
 -}
 
 import Form.Tree as Tree exposing (Tree)
+
+
+type FieldDef data a
+    = FieldDef (Maybe (data -> a)) (a -> Field) (Field -> Maybe a)
+
+
+text : FieldDef data String
+text =
+    FieldDef Nothing string asString
+
+
+boolean : FieldDef data Bool
+boolean =
+    FieldDef Nothing bool asBool
+
+
+withInitialValue : (data -> String) -> FieldDef data String -> FieldDef data String
+withInitialValue load (FieldDef _ toField toFieldValue) =
+    FieldDef (Just load) toField toFieldValue
 
 
 {-| A field is a tree node.

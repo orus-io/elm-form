@@ -19,7 +19,10 @@ type Msg
 
 init : () -> ( Model, Cmd Msg )
 init flags =
-    ( { loginForm = LoginForm.form.init () Nothing }, Cmd.none )
+    ( { loginForm = LoginForm.form.init () (Just { login = "login", password = "pass", rememberMe = False })
+      }
+    , Cmd.none
+    )
 
 
 subscriptions model =
