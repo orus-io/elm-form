@@ -30,6 +30,14 @@ type alias FieldRef =
     Internal.FieldRef
 
 
+type alias FieldSuperState customError a =
+    { state : FieldState customError a
+    , onInput : InputType -> a -> Msg
+    , onBlur : Msg
+    , onFocus : Msg
+    }
+
+
 init : { validate : validate, view : view } -> Builder validate view model customError output
 init { validate, view } =
     Builder
@@ -42,26 +50,33 @@ init { validate, view } =
 field :
     String
     -> FieldDef output a
-    -> Builder (FieldRef -> validate) (FieldState customError a -> view) model customError output
+    -> Builder (FieldRef -> validate) (FieldSuperState customError a -> view) model customError output
     -> Builder validate view model customError output
 field name (FieldDef fieldload toField toFieldValue) (Builder { validate, view, load }) =
     Builder
         { load =
             case fieldload of
                 Just l ->
-                    (\d -> ( name, l d |> toField )) :: load
+                    (\d -> ( name, l d |> toField |> Field.value )) :: load
 
                 Nothing ->
                     load
         , validate = validate <| Internal.FieldRef name
         , view =
             \model (F formModel) ->
+                let
+                    state =
+                        getField (getAnyAt toFieldValue)
+                            name
+                            (F formModel)
+                in
                 view model
                     (F formModel)
-                    (getField (getAnyAt toFieldValue)
-                        name
-                        (F formModel)
-                    )
+                    { state = state
+                    , onInput = \t value -> Input state.path t <| toField value
+                    , onBlur = Blur state.path
+                    , onFocus = Focus state.path
+                    }
         }
 
 

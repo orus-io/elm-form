@@ -1,5 +1,5 @@
 module Form.Field exposing
-    ( Field, FieldValue(..), value, string, bool, group, list
+    ( Field, FieldValue(..), value, string, bool, group, list, custom
     , asString, asBool
     , FieldDef(..), boolean, text, withInitialValue
     )
@@ -9,7 +9,7 @@ module Form.Field exposing
 
 # Constructors
 
-@docs Field, FieldValue, value, string, bool, group, list
+@docs Field, FieldValue, value, string, bool, group, list, custom
 
 
 # Value readers
@@ -22,17 +22,22 @@ import Form.Tree as Tree exposing (Tree)
 
 
 type FieldDef data a
-    = FieldDef (Maybe (data -> a)) (a -> Field) (Field -> Maybe a)
+    = FieldDef (Maybe (data -> a)) (a -> FieldValue) (Field -> Maybe a)
 
 
 text : FieldDef data String
 text =
-    FieldDef Nothing string asString
+    FieldDef Nothing String asString
 
 
 boolean : FieldDef data Bool
 boolean =
-    FieldDef Nothing bool asBool
+    FieldDef Nothing Bool asBool
+
+
+custom : (option -> String) -> (String -> Maybe option) -> FieldDef data option
+custom toString fromString =
+    FieldDef Nothing (toString >> String) (asString >> Maybe.andThen fromString)
 
 
 withInitialValue : (data -> String) -> FieldDef data String -> FieldDef data String

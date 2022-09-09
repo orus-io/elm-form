@@ -2,6 +2,7 @@ module Main exposing (..)
 
 -- import AddressForm
 
+import AddressForm
 import Browser
 import Effect
 import Element
@@ -9,17 +10,21 @@ import LoginForm
 
 
 type alias Model =
-    { loginForm : LoginForm.FormData }
+    { loginForm : LoginForm.FormData
+    , addressForm : AddressForm.FormData
+    }
 
 
 type Msg
     = Noop
     | LoginFormMsg LoginForm.Msg
+    | AddressFormMsg AddressForm.Msg
 
 
 init : () -> ( Model, Cmd Msg )
 init flags =
     ( { loginForm = LoginForm.form.init () (Just { login = "login", password = "pass", rememberMe = False })
+      , addressForm = AddressForm.form.init () Nothing
       }
     , Cmd.none
     )
@@ -43,6 +48,15 @@ update msg model =
             , Effect.toCmd ( always Noop, LoginFormMsg ) effect
             )
 
+        AddressFormMsg subMsg ->
+            let
+                ( addressForm, effect ) =
+                    AddressForm.form.update () subMsg model.addressForm
+            in
+            ( { model | addressForm = addressForm }
+            , Effect.toCmd ( always Noop, AddressFormMsg ) effect
+            )
+
 
 view model =
     Element.layout
@@ -50,8 +64,17 @@ view model =
         , Element.height Element.fill
         ]
     <|
-        Element.map LoginFormMsg <|
-            LoginForm.form.view () model.loginForm
+        Element.row
+            [ Element.width Element.fill
+            , Element.height Element.fill
+            ]
+            [ Element.el [ Element.width Element.fill ] <|
+                Element.map LoginFormMsg <|
+                    LoginForm.form.view () model.loginForm
+            , Element.el [ Element.width Element.fill ] <|
+                Element.map AddressFormMsg <|
+                    AddressForm.form.view () model.addressForm
+            ]
 
 
 main =
