@@ -7,7 +7,7 @@ import Form
 import Form.Field
 
 
-textInput : Form.FieldSuperState customError String -> Element Form.Msg
+textInput : Form.FieldViewState customError String -> Element Form.Msg
 textInput { state } =
     Input.text
         [ Events.onFocus <| Form.Focus state.path
@@ -20,7 +20,7 @@ textInput { state } =
         }
 
 
-checkbox : Form.FieldSuperState customError Bool -> Element Form.Msg
+checkbox : Form.FieldViewState customError Bool -> Element Form.Msg
 checkbox { state } =
     Input.checkbox
         [ Events.onFocus <| Form.Focus state.path
@@ -39,7 +39,7 @@ radio :
         { options : List (Input.Option value Form.Msg)
         , label : Input.Label Form.Msg
         }
-    -> Form.FieldSuperState customError value
+    -> Form.FieldViewState customError value
     -> Element Form.Msg
 radio attrs { options, label } { state, onFocus, onBlur, onInput } =
     Input.radio

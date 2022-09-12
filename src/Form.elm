@@ -30,7 +30,7 @@ type alias FieldRef =
     Internal.FieldRef
 
 
-type alias FieldSuperState customError a =
+type alias FieldViewState customError a =
     { state : FieldState customError a
     , onInput : InputType -> a -> Msg
     , onBlur : Msg
@@ -50,7 +50,7 @@ init { validate, view } =
 field :
     String
     -> FieldDef output a
-    -> Builder (FieldRef -> validate) (FieldSuperState customError a -> view) model customError output
+    -> Builder (FieldRef -> validate) (FieldViewState customError a -> view) model customError output
     -> Builder validate view model customError output
 field name (FieldDef fieldload toField toFieldValue) (Builder { validate, view, load }) =
     Builder
