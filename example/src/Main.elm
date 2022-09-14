@@ -23,10 +23,21 @@ type Msg
 
 init : () -> ( Model, Cmd Msg )
 init flags =
-    ( { loginForm = LoginForm.form.init () (Just { login = "login", password = "pass", rememberMe = False })
-      , addressForm = AddressForm.form.init () Nothing
+    let
+        ( loginForm, loginEffect ) =
+            LoginForm.form.init () (Just { login = "login", password = "pass", rememberMe = False })
+
+        ( addressForm, addressEffect ) =
+            AddressForm.form.init () Nothing
+    in
+    ( { loginForm = loginForm
+      , addressForm = addressForm
       }
-    , Cmd.none
+    , Effect.toCmd ( always Noop, identity ) <|
+        Effect.batch
+            [ Effect.map LoginFormMsg loginEffect
+            , Effect.map AddressFormMsg addressEffect
+            ]
     )
 
 

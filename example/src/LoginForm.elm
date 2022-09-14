@@ -15,18 +15,12 @@ type alias Credentials =
     }
 
 
-type alias Model =
-    { model : ()
-    , data : Form String Credentials
-    }
-
-
 type alias FormData =
-    Form String Credentials
+    Builder.Model String Credentials ()
 
 
 type alias Msg =
-    Form.Msg
+    Builder.Msg ()
 
 
 form =

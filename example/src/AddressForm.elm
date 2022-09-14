@@ -1,11 +1,13 @@
 module AddressForm exposing (..)
 
+import Dropdown
 import Element
 import Element.Input as Input
 import Enum exposing (Enum)
 import Form exposing (Form)
 import Form.Builder as Builder
 import Form.Field as Field
+import Form.FieldStack
 import Form.Validate as Validate
 import Widgets
 
@@ -17,11 +19,11 @@ type StreetKind
 
 
 type alias FormData =
-    Form String Address
+    Builder.Model String Address ( Dropdown.State StreetKind, () )
 
 
 type alias Msg =
-    Form.Msg
+    Builder.Msg (Form.FieldStack.Msg (Widgets.DropdownMsg StreetKind) ())
 
 
 streetKindEnum : Enum StreetKind
@@ -31,6 +33,19 @@ streetKindEnum =
         , ( Boulevard, "bld" )
         , ( Street, "str" )
         ]
+
+
+streetKindLabel : StreetKind -> String
+streetKindLabel kind =
+    case kind of
+        Avenue ->
+            "Avenue"
+
+        Boulevard ->
+            "Boulevard"
+
+        Street ->
+            "Street"
 
 
 type alias Address =
@@ -64,18 +79,16 @@ form =
                     , Element.centerX
                     , Element.centerY
                     ]
-                    [ Widgets.radio []
-                        { options =
-                            [ Input.option Avenue <| Element.text "Avenue"
-                            , Input.option Boulevard <| Element.text "Boulevard"
-                            , Input.option Street <| Element.text "Street"
-                            ]
-                        , label = Input.labelHidden "Type de rue"
+                    [ Widgets.dropdownSelectView
+                        { options = streetKindEnum.values
+                        , dropdownOptions = []
+                        , itemToPrompt = streetKindLabel >> Element.text
+                        , itemToElement = \_ _ -> streetKindLabel >> Element.text
                         }
                         street_kind
                     ]
         }
-        |> Builder.field "street_kind" (Field.custom streetKindEnum.toString streetKindEnum.fromString)
+        |> Builder.fieldWithState "street_kind" (Field.custom streetKindEnum.toString streetKindEnum.fromString) Widgets.dropdownSelect
         |> Builder.field "street" Field.text
         |> Builder.field "zip_code" Field.text
         |> Builder.field "city" Field.text
