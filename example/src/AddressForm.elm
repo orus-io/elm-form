@@ -4,6 +4,7 @@ import Element
 import Element.Input as Input
 import Enum exposing (Enum)
 import Form exposing (Form)
+import Form.Builder as Builder
 import Form.Field as Field
 import Form.Validate as Validate
 import Widgets
@@ -41,7 +42,7 @@ type alias Address =
 
 
 form =
-    Form.init
+    Builder.init
         { validate =
             \street_kind street zip_code city _ ->
                 Validate.succeed Address
@@ -74,8 +75,8 @@ form =
                         street_kind
                     ]
         }
-        |> Form.field "street_kind" (Field.custom streetKindEnum.toString streetKindEnum.fromString)
-        |> Form.field "street" Field.text
-        |> Form.field "zip_code" Field.text
-        |> Form.field "city" Field.text
-        |> Form.finalize
+        |> Builder.field "street_kind" (Field.custom streetKindEnum.toString streetKindEnum.fromString)
+        |> Builder.field "street" Field.text
+        |> Builder.field "zip_code" Field.text
+        |> Builder.field "city" Field.text
+        |> Builder.finalize

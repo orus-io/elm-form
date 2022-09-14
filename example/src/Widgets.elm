@@ -4,10 +4,11 @@ import Element exposing (Attribute, Element)
 import Element.Events as Events
 import Element.Input as Input
 import Form
+import Form.Builder as Builder
 import Form.Field
 
 
-textInput : Form.FieldViewState customError String -> Element Form.Msg
+textInput : Builder.FieldViewState customError String -> Element Form.Msg
 textInput { state } =
     Input.text
         [ Events.onFocus <| Form.Focus state.path
@@ -20,7 +21,7 @@ textInput { state } =
         }
 
 
-checkbox : Form.FieldViewState customError Bool -> Element Form.Msg
+checkbox : Builder.FieldViewState customError Bool -> Element Form.Msg
 checkbox { state } =
     Input.checkbox
         [ Events.onFocus <| Form.Focus state.path
@@ -39,7 +40,7 @@ radio :
         { options : List (Input.Option value Form.Msg)
         , label : Input.Label Form.Msg
         }
-    -> Form.FieldViewState customError value
+    -> Builder.FieldViewState customError value
     -> Element Form.Msg
 radio attrs { options, label } { state, onFocus, onBlur, onInput } =
     Input.radio
