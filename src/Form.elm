@@ -94,6 +94,11 @@ getFieldAsBool =
     getField getBoolAt
 
 
+getFieldAs : (Field -> Maybe a) -> String -> Form e o -> FieldState e a
+getFieldAs fromField =
+    getField (getAnyAt fromField)
+
+
 getField : (String -> Form e o -> Maybe a) -> String -> Form e o -> FieldState e a
 getField getValue path form =
     { path = path
