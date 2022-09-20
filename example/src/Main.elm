@@ -1,8 +1,7 @@
 module Main exposing (..)
 
--- import AddressForm
+-- import PersonForm
 
-import AddressForm
 import Browser
 import Effect
 import Element
@@ -13,7 +12,6 @@ import PersonForm
 
 type alias Model =
     { loginForm : LoginForm.FormData
-    , addressForm : AddressForm.FormData
     , personForm : PersonForm.FormData
     }
 
@@ -21,7 +19,6 @@ type alias Model =
 type Msg
     = Noop
     | LoginFormMsg LoginForm.Msg
-    | AddressFormMsg AddressForm.Msg
     | PersonFormMsg PersonForm.Msg
 
 
@@ -31,20 +28,15 @@ init flags =
         ( loginForm, loginEffect ) =
             LoginForm.form.init () (Just { login = "login", password = "pass", rememberMe = False })
 
-        ( addressForm, addressEffect ) =
-            AddressForm.form.init () Nothing
-
         ( personForm, personEffect ) =
             PersonForm.form.init () Nothing
     in
     ( { loginForm = loginForm
-      , addressForm = addressForm
       , personForm = personForm
       }
     , Effect.toCmd ( always Noop, identity ) <|
         Effect.batch
             [ Effect.map LoginFormMsg loginEffect
-            , Effect.map AddressFormMsg addressEffect
             , Effect.map PersonFormMsg personEffect
             ]
     )
@@ -58,15 +50,6 @@ update msg model =
     case msg of
         Noop ->
             ( model, Cmd.none )
-
-        AddressFormMsg subMsg ->
-            let
-                ( addressForm, effect ) =
-                    AddressForm.form.update () subMsg model.addressForm
-            in
-            ( { model | addressForm = addressForm }
-            , Effect.toCmd ( always Noop, AddressFormMsg ) effect
-            )
 
         LoginFormMsg subMsg ->
             let
@@ -100,9 +83,6 @@ view model =
             [ Element.el [ Element.width Element.fill ] <|
                 Element.map LoginFormMsg <|
                     LoginForm.form.view () model.loginForm
-            , Element.el [ Element.width Element.fill ] <|
-                Element.map AddressFormMsg <|
-                    AddressForm.form.view () model.addressForm
             , Element.column [ Element.width Element.fill, Element.spacing 20 ]
                 [ Form.getOutput model.personForm.form
                     |> Maybe.map PersonForm.viewPerson

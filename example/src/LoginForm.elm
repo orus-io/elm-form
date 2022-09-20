@@ -26,13 +26,13 @@ type alias Msg =
 form =
     Builder.init
         { validate =
-            \login password rememberMe _ ->
+            \_ login password rememberMe ->
                 Validate.succeed Credentials
                     |> Validate.andMap login.valid
                     |> Validate.andMap password.valid
                     |> Validate.andMap rememberMe.valid
         , view =
-            \login password rememberMe model ->
+            \model login password rememberMe ->
                 Element.column
                     [ Element.spacing 20
                     , Element.centerX

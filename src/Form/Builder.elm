@@ -20,12 +20,12 @@ type alias Model customError output stackModel =
     }
 
 
-type Builder validate view model customError sharedMsg output stackModel stackMsg topStackMsg
+type Builder validate view model customError sharedMsg output stackModel stackMsg topOutput topStackMsg
     = Builder
         { load : List (output -> ( String, Field ))
         , validate : validate
-        , view : (stackMsg -> topStackMsg) -> model -> Model customError output stackModel -> view
-        , stack : Stack customError output sharedMsg stackModel stackMsg
+        , view : (stackMsg -> topStackMsg) -> model -> Model customError topOutput stackModel -> view
+        , stack : Stack customError topOutput sharedMsg stackModel stackMsg
         }
 
 
@@ -138,13 +138,13 @@ andThen filter fieldv =
 
 
 init :
-    { validate : validate, view : view }
-    -> Builder validate view model customError sharedMsg output () () topStackMsg
+    { validate : model -> validate, view : model -> view }
+    -> Builder (model -> validate) view model customError sharedMsg output () () topOutput topStackMsg
 init { validate, view } =
     Builder
         { load = []
         , validate = validate
-        , view = \_ _ _ -> view
+        , view = \_ model _ -> view model
         , stack = FieldStack.init
         }
 
@@ -152,8 +152,8 @@ init { validate, view } =
 field :
     String
     -> FieldDef output a
-    -> Builder (FieldValidate customError a -> validate) (FieldViewState customError a topStackMsg -> view) model customError sharedMsg output stackModel stackMsg topStackMsg
-    -> Builder validate view model customError sharedMsg output stackModel stackMsg topStackMsg
+    -> Builder (model -> FieldValidate customError a -> validate) (FieldViewState customError a topStackMsg -> view) model customError sharedMsg output stackModel stackMsg topOutput topStackMsg
+    -> Builder (model -> validate) view model customError sharedMsg output stackModel stackMsg topOutput topStackMsg
 field name (FieldDef fieldload toField fromField) (Builder { validate, view, load, stack }) =
     Builder
         { load =
@@ -163,7 +163,9 @@ field name (FieldDef fieldload toField fromField) (Builder { validate, view, loa
 
                 Nothing ->
                     load
-        , validate = validate <| fieldValidate name fromField
+        , validate =
+            \model ->
+                validate model <| fieldValidate name fromField
         , view =
             \toStackMsg model state ->
                 let
@@ -187,8 +189,8 @@ fieldWithState :
     String
     -> FieldDef output a
     -> (FieldDef output a -> FieldStack.FieldComponent customError a componentModel sharedMsg componentMsg)
-    -> Builder (FieldValidate customError a -> validate) (FieldComponentViewState customError a topStackMsg componentModel componentMsg -> view) model customError sharedMsg output stackModel stackMsg topStackMsg
-    -> Builder validate view model customError sharedMsg output ( componentModel, stackModel ) (FieldStack.Msg componentMsg stackMsg) topStackMsg
+    -> Builder (model -> FieldValidate customError a -> validate) (FieldComponentViewState customError a topStackMsg componentModel componentMsg -> view) model customError sharedMsg output stackModel stackMsg topOutput topStackMsg
+    -> Builder (model -> validate) view model customError sharedMsg output ( componentModel, stackModel ) (FieldStack.Msg componentMsg stackMsg) topOutput topStackMsg
 fieldWithState name (FieldDef fieldload toField fromField) component (Builder { validate, view, load, stack }) =
     Builder
         { load =
@@ -198,7 +200,7 @@ fieldWithState name (FieldDef fieldload toField fromField) component (Builder { 
 
                 Nothing ->
                     load
-        , validate = validate <| fieldValidate name fromField
+        , validate = \model -> validate model <| fieldValidate name fromField
         , view =
             \toStackMsg model state ->
                 let
@@ -228,8 +230,8 @@ list :
     String
     -> Maybe (output -> List a)
     -> FieldDef output a
-    -> Builder (FieldListValidate customError a -> validate) (FieldListViewState customError a stackMsg -> view) model customError sharedMsg output stackModel stackMsg topStackMsg
-    -> Builder validate view model customError sharedMsg output stackModel stackMsg topStackMsg
+    -> Builder (model -> FieldListValidate customError a -> validate) (FieldListViewState customError a topStackMsg -> view) model customError sharedMsg output stackModel stackMsg topOutput topStackMsg
+    -> Builder (model -> validate) view model customError sharedMsg output stackModel stackMsg topOutput topStackMsg
 list name fieldlistload (FieldDef _ toField fromField) (Builder { validate, view, load, stack }) =
     Builder
         { load =
@@ -239,7 +241,7 @@ list name fieldlistload (FieldDef _ toField fromField) (Builder { validate, view
 
                 Nothing ->
                     load
-        , validate = validate <| fieldListValidate name fromField
+        , validate = \model -> validate model <| fieldListValidate name fromField
         , view =
             \toStackMsg model state ->
                 let
@@ -273,23 +275,53 @@ list name fieldlistload (FieldDef _ toField fromField) (Builder { validate, view
         }
 
 
+group :
+    String
+    -> (output -> groupOutput)
+    -> Builder (model -> Validation customError groupOutput) groupView model customError sharedMsg groupOutput groupStackModel groupStackMsg topOutput topStackMsg
+    -> Builder (model -> Validation customError groupOutput -> validate) (groupView -> view) model customError sharedMsg output stackModel stackMsg topOutput topStackMsg
+    -> Builder (model -> validate) view model customError sharedMsg output ( groupStackModel, stackModel ) (FieldStack.Msg groupStackMsg stackMsg) topOutput topStackMsg
+group name getGroupData (Builder groupBuilder) (Builder builder) =
+    Builder
+        { load =
+            (\data ->
+                let
+                    groupData =
+                        getGroupData data
+                in
+                ( name, groupBuilder.load |> List.map (\l -> l groupData) |> Field.group )
+            )
+                :: builder.load
+        , validate =
+            \model ->
+                builder.validate model <|
+                    Validate.field name (groupBuilder.validate model)
 
-{-
-   group :
-       String
-       -> Builder groupValidate groupView groupModel groupCustomError groupSharedMsg groupOutput groupModel groupStackMsg topStackMsg
-       -> Builder (FieldRef -> validate) (FieldComponentViewState customError a topStackMsg componentModel componentMsg -> view) model customError sharedMsg output stackModel stackMsg topStackMsg
-       -> Builder validate view model customError sharedMsg output ( componentModel, stackModel ) (FieldStack.Msg componentMsg stackMsg) topStackMsg
-   group name group (Builder builder) =
-       Builder
-           { load =
-           , validate = validate <|
-           }
--}
+        -- view : (stackMsg -> topStackMsg) -> model -> Model customError topOutput stackModel -> view
+        , view =
+            \toStackMsg model state ->
+                let
+                    groupView =
+                        groupBuilder.view (FieldStack.CurrentMsg >> toStackMsg)
+                            model
+                            { form = state.form
+                            , stack = Tuple.first state.stack
+                            }
+                in
+                builder.view (FieldStack.PreviousMsg >> toStackMsg)
+                    model
+                    { form = state.form
+                    , stack = Tuple.second state.stack
+                    }
+                    groupView
+        , stack =
+            builder.stack
+                |> FieldStack.addStack name groupBuilder.stack
+        }
 
 
 finalize :
-    Builder (model -> Validation customError output) (model -> view) model customError sharedMsg output stackModel stackMsg stackMsg
+    Builder (model -> Validation customError output) view model customError sharedMsg output stackModel stackMsg output stackMsg
     -> FormDef customError output sharedMsg model view stackModel stackMsg
 finalize (Builder { validate, view, load, stack }) =
     { init =
@@ -304,7 +336,7 @@ finalize (Builder { validate, view, load, stack }) =
                         (validate model)
 
                 ( stackModel, stackEffect ) =
-                    stack.init formState
+                    stack.init "" formState
             in
             ( { form = formState
               , stack = stackModel
@@ -324,7 +356,7 @@ finalize (Builder { validate, view, load, stack }) =
                 StackMsg stackMsg ->
                     let
                         ( nextStack, maybeFormMsg, stackEffect ) =
-                            stack.update state.form stackMsg state.stack
+                            stack.update "" state.form stackMsg state.stack
 
                         nextForm =
                             case maybeFormMsg of
@@ -341,8 +373,8 @@ finalize (Builder { validate, view, load, stack }) =
                     )
     , subscriptions =
         \_ state ->
-            Sub.map StackMsg <| stack.subscriptions state.form state.stack
+            Sub.map StackMsg <| stack.subscriptions "" state.form state.stack
     , view =
         \model form ->
-            view identity model form model
+            view identity model form
     }

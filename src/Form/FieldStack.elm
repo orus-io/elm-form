@@ -3,6 +3,7 @@ module Form.FieldStack exposing
     , Msg(..)
     , Stack
     , add
+    , addStack
     , init
     )
 
@@ -21,9 +22,9 @@ type Msg current previous
 {-| A Stack combines fields into a single TEA component
 -}
 type alias Stack customError output sharedMsg model msg =
-    { init : Form.Form customError output -> ( model, Effect sharedMsg msg )
-    , update : Form.Form customError output -> msg -> model -> ( model, Maybe Form.Msg, Effect sharedMsg msg )
-    , subscriptions : Form.Form customError output -> model -> Sub msg
+    { init : String -> Form.Form customError output -> ( model, Effect sharedMsg msg )
+    , update : String -> Form.Form customError output -> msg -> model -> ( model, Maybe Form.Msg, Effect sharedMsg msg )
+    , subscriptions : String -> Form.Form customError output -> model -> Sub msg
     }
 
 
@@ -42,10 +43,19 @@ happen if the application is properly defined.
 -}
 init : Stack customError output sharedMsg () ()
 init =
-    { init = \_ -> ( (), Effect.none )
-    , update = \_ () () -> ( (), Nothing, Effect.none )
-    , subscriptions = \_ () -> Sub.none
+    { init = \_ _ -> ( (), Effect.none )
+    , update = \_ _ () () -> ( (), Nothing, Effect.none )
+    , subscriptions = \_ _ () -> Sub.none
     }
+
+
+path : String -> String -> String
+path prefix name =
+    if prefix == "" then
+        name
+
+    else
+        prefix ++ "." ++ name
 
 
 {-| Add a page to a Stack
@@ -56,18 +66,18 @@ add :
     -> FieldComponent customError a fieldModel sharedMsg fieldMsg
     -> Stack customError output sharedMsg previousModel previousMsg
     -> Stack customError output sharedMsg ( fieldModel, previousModel ) (Msg fieldMsg previousMsg)
-add path fromField field previousStack =
+add name fromField field previousStack =
     { init =
-        \form ->
+        \prefix form ->
             let
                 fieldstate =
-                    Form.getFieldAs fromField path form
+                    Form.getFieldAs fromField (path prefix name) form
 
                 ( fieldModel, fieldEffect ) =
                     field.init fieldstate
 
                 ( previousModel, previousEffect ) =
-                    previousStack.init form
+                    previousStack.init prefix form
             in
             ( ( fieldModel, previousModel )
             , Effect.batch
@@ -76,12 +86,12 @@ add path fromField field previousStack =
                 ]
             )
     , update =
-        \form msg ( fieldModel, previousModel ) ->
+        \prefix form msg ( fieldModel, previousModel ) ->
             case msg of
                 CurrentMsg fieldMsg ->
                     let
                         fieldstate =
-                            Form.getFieldAs fromField path form
+                            Form.getFieldAs fromField (path prefix name) form
 
                         ( newFieldModel, formMsg, fieldEffect ) =
                             field.update fieldstate fieldMsg fieldModel
@@ -94,20 +104,72 @@ add path fromField field previousStack =
                 PreviousMsg previousMsg ->
                     let
                         ( newPreviousModel, formMsg, previousEffect ) =
-                            previousStack.update form previousMsg previousModel
+                            previousStack.update prefix form previousMsg previousModel
                     in
                     ( ( fieldModel, newPreviousModel )
                     , formMsg
                     , Effect.map PreviousMsg previousEffect
                     )
     , subscriptions =
-        \form ( fieldModel, previousModel ) ->
+        \prefix form ( fieldModel, previousModel ) ->
             let
                 fieldstate =
-                    Form.getFieldAs fromField path form
+                    Form.getFieldAs fromField (path prefix name) form
             in
             Sub.batch
                 [ Sub.map CurrentMsg <| field.subscriptions fieldstate fieldModel
-                , Sub.map PreviousMsg <| previousStack.subscriptions form previousModel
+                , Sub.map PreviousMsg <| previousStack.subscriptions prefix form previousModel
+                ]
+    }
+
+
+addStack :
+    String
+    -> Stack customError output sharedMsg groupModel groupMsg
+    -> Stack customError output sharedMsg previousModel previousMsg
+    -> Stack customError output sharedMsg ( groupModel, previousModel ) (Msg groupMsg previousMsg)
+addStack name group previousStack =
+    { init =
+        \prefix form ->
+            let
+                ( previousModel, previousEffect ) =
+                    previousStack.init prefix form
+
+                ( groupModel, groupEffect ) =
+                    group.init (path prefix name) form
+            in
+            ( ( groupModel, previousModel )
+            , Effect.batch
+                [ Effect.map PreviousMsg previousEffect
+                , Effect.map CurrentMsg groupEffect
+                ]
+            )
+    , update =
+        \prefix form msg ( groupModel, previousModel ) ->
+            case msg of
+                CurrentMsg groupMsg ->
+                    let
+                        ( newGroupModel, formMsg, groupEffect ) =
+                            group.update (path prefix name) form groupMsg groupModel
+                    in
+                    ( ( newGroupModel, previousModel )
+                    , formMsg
+                    , Effect.map CurrentMsg groupEffect
+                    )
+
+                PreviousMsg previousMsg ->
+                    let
+                        ( newPreviousModel, formMsg, previousEffect ) =
+                            previousStack.update prefix form previousMsg previousModel
+                    in
+                    ( ( groupModel, newPreviousModel )
+                    , formMsg
+                    , Effect.map PreviousMsg previousEffect
+                    )
+    , subscriptions =
+        \prefix form ( groupModel, previousModel ) ->
+            Sub.batch
+                [ Sub.map CurrentMsg <| group.subscriptions (path prefix name) form groupModel
+                , Sub.map PreviousMsg <| previousStack.subscriptions prefix form previousModel
                 ]
     }
