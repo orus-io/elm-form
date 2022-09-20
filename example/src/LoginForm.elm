@@ -28,9 +28,9 @@ form =
         { validate =
             \login password rememberMe _ ->
                 Validate.succeed Credentials
-                    |> Validate.andMap (Validate.field login Validate.string)
-                    |> Validate.andMap (Validate.field password Validate.string)
-                    |> Validate.andMap (Validate.field rememberMe Validate.bool)
+                    |> Validate.andMap login.valid
+                    |> Validate.andMap password.valid
+                    |> Validate.andMap rememberMe.valid
         , view =
             \login password rememberMe model ->
                 Element.column

@@ -61,17 +61,10 @@ form =
         { validate =
             \street_kind street zip_code city _ ->
                 Validate.succeed Address
-                    |> Validate.andMap
-                        (Validate.field street_kind Validate.string
-                            |> Validate.andThen
-                                (streetKindEnum.fromString
-                                    >> Maybe.map Validate.succeed
-                                    >> Maybe.withDefault (Validate.fail <| Validate.customError "")
-                                )
-                        )
-                    |> Validate.andMap (Validate.field street Validate.string)
-                    |> Validate.andMap (Validate.field zip_code Validate.string)
-                    |> Validate.andMap (Validate.field city Validate.string)
+                    |> Validate.andMap street_kind.valid
+                    |> Validate.andMap street.valid
+                    |> Validate.andMap zip_code.valid
+                    |> Validate.andMap city.valid
         , view =
             \street_kind street zip_code city _ ->
                 Element.column

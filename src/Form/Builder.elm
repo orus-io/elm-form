@@ -2,6 +2,7 @@ module Form.Builder exposing (..)
 
 import Effect exposing (Effect)
 import Form exposing (FieldState, Form(..), InputType, getAnyAt, getField)
+import Form.Error as Error
 import Form.Field as Field exposing (Field, FieldDef(..))
 import Form.FieldStack as FieldStack exposing (Stack)
 import Form.Validate as Validate exposing (Validation)
@@ -36,10 +37,6 @@ type alias FormDef customError output sharedMsg model view stackModel stackMsg =
     }
 
 
-type alias FieldRef =
-    Internal.FieldRef
-
-
 onInput : FieldDef output a -> InputType -> FieldState customError a -> a -> Form.Msg
 onInput (FieldDef _ toFieldValue _) inputType { path } value =
     Form.Input path inputType (toFieldValue value)
@@ -70,6 +67,26 @@ type alias FieldComponentViewState customError a stackMsg componentModel compone
     }
 
 
+type alias FieldValidate customError a =
+    { valid : Validation customError a
+    , validOrEmpty : Validation customError (Maybe a)
+    }
+
+
+fieldValidate : String -> (Field -> Maybe a) -> FieldValidate customError a
+fieldValidate fieldname fromField =
+    { valid =
+        fromField
+            >> Maybe.map Ok
+            >> Maybe.withDefault (Err <| Error.value Error.Empty)
+            |> Validate.field fieldname
+    , validOrEmpty =
+        fromField
+            >> Ok
+            |> Validate.field fieldname
+    }
+
+
 init :
     { validate : validate, view : view }
     -> Builder validate view model customError sharedMsg output () () topStackMsg
@@ -85,9 +102,9 @@ init { validate, view } =
 field :
     String
     -> FieldDef output a
-    -> Builder (FieldRef -> validate) (FieldViewState customError a stackMsg -> view) model customError sharedMsg output stackModel stackMsg topStackMsg
+    -> Builder (FieldValidate customError a -> validate) (FieldViewState customError a stackMsg -> view) model customError sharedMsg output stackModel stackMsg topStackMsg
     -> Builder validate view model customError sharedMsg output stackModel stackMsg topStackMsg
-field name (FieldDef fieldload toField toFieldValue) (Builder { validate, view, load, stack }) =
+field name (FieldDef fieldload toField fromField) (Builder { validate, view, load, stack }) =
     Builder
         { load =
             case fieldload of
@@ -96,12 +113,12 @@ field name (FieldDef fieldload toField toFieldValue) (Builder { validate, view, 
 
                 Nothing ->
                     load
-        , validate = validate <| Internal.FieldRef name
+        , validate = validate <| fieldValidate name fromField
         , view =
             \toStackMsg model state ->
                 let
                     fieldState =
-                        Form.getFieldAs toFieldValue name state.form
+                        Form.getFieldAs fromField name state.form
                 in
                 view toStackMsg
                     model
@@ -120,9 +137,9 @@ fieldWithState :
     String
     -> FieldDef output a
     -> (FieldDef output a -> FieldStack.FieldComponent customError a componentModel sharedMsg componentMsg)
-    -> Builder (FieldRef -> validate) (FieldComponentViewState customError a topStackMsg componentModel componentMsg -> view) model customError sharedMsg output stackModel stackMsg topStackMsg
+    -> Builder (FieldValidate customError a -> validate) (FieldComponentViewState customError a topStackMsg componentModel componentMsg -> view) model customError sharedMsg output stackModel stackMsg topStackMsg
     -> Builder validate view model customError sharedMsg output ( componentModel, stackModel ) (FieldStack.Msg componentMsg stackMsg) topStackMsg
-fieldWithState name (FieldDef fieldload toField toFieldValue) component (Builder { validate, view, load, stack }) =
+fieldWithState name (FieldDef fieldload toField fromField) component (Builder { validate, view, load, stack }) =
     Builder
         { load =
             case fieldload of
@@ -131,12 +148,12 @@ fieldWithState name (FieldDef fieldload toField toFieldValue) component (Builder
 
                 Nothing ->
                     load
-        , validate = validate <| Internal.FieldRef name
+        , validate = validate <| fieldValidate name fromField
         , view =
             \toStackMsg model state ->
                 let
                     fieldState =
-                        Form.getFieldAs toFieldValue name state.form
+                        Form.getFieldAs fromField name state.form
                 in
                 view (FieldStack.PreviousMsg >> toStackMsg)
                     model
@@ -153,8 +170,23 @@ fieldWithState name (FieldDef fieldload toField toFieldValue) component (Builder
                     }
         , stack =
             stack
-                |> FieldStack.add name toFieldValue (component (FieldDef fieldload toField toFieldValue))
+                |> FieldStack.add name fromField (component (FieldDef fieldload toField fromField))
         }
+
+
+
+{-
+   group :
+       String
+       -> Builder groupValidate groupView groupModel groupCustomError groupSharedMsg groupOutput groupModel groupStackMsg topStackMsg
+       -> Builder (FieldRef -> validate) (FieldComponentViewState customError a topStackMsg componentModel componentMsg -> view) model customError sharedMsg output stackModel stackMsg topStackMsg
+       -> Builder validate view model customError sharedMsg output ( componentModel, stackModel ) (FieldStack.Msg componentMsg stackMsg) topStackMsg
+   group name group (Builder builder) =
+       Builder
+           { load =
+           , validate = validate <|
+           }
+-}
 
 
 finalize :
