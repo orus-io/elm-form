@@ -70,6 +70,8 @@ type alias FieldComponentViewState customError a stackMsg componentModel compone
 type alias FieldValidate customError a =
     { valid : Validation customError a
     , validOrEmpty : Validation customError (Maybe a)
+    , name : String
+    , fromField : Field -> Maybe a
     }
 
 
@@ -84,7 +86,19 @@ fieldValidate fieldname fromField =
         fromField
             >> Ok
             |> Validate.field fieldname
+    , name = fieldname
+    , fromField = fromField
     }
+
+
+andThen : (a -> Validation customError b) -> FieldValidate customError a -> Validation customError b
+andThen filter fieldv =
+    Validate.field fieldv.name
+        (fieldv.fromField
+            >> Maybe.map Ok
+            >> Maybe.withDefault (Err <| Error.value Error.Empty)
+            |> Validate.andThen filter
+        )
 
 
 init :
