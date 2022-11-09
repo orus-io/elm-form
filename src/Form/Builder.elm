@@ -5,8 +5,8 @@ import Form exposing (FieldState, Form(..), InputType, getAnyAt, getField)
 import Form.Error as Error
 import Form.Field as Field exposing (Field, FieldDef(..))
 import Form.FieldStack as FieldStack exposing (Stack)
+import Form.Internal as Internal
 import Form.Validate as Validate exposing (Validation)
-import Internal
 
 
 type Msg stackMsg

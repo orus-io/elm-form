@@ -1,4 +1,4 @@
-module Internal exposing (..)
+module Form.Internal exposing (..)
 
 
 type FieldRef

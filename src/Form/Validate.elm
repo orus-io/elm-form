@@ -38,8 +38,8 @@ module Form.Validate exposing
 import Dict exposing (Dict)
 import Form.Error as Error exposing (Error, ErrorValue(..))
 import Form.Field as Field exposing (Field, FieldValue(..))
+import Form.Internal as Internal
 import Form.Tree as Tree
-import Internal
 import Regex exposing (Regex)
 import Result
 import String
