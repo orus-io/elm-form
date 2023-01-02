@@ -6,6 +6,7 @@ import AddressForm
 import Browser
 import Effect
 import Element
+import Form
 import LoginForm
 import PersonForm
 
@@ -102,9 +103,13 @@ view model =
             , Element.el [ Element.width Element.fill ] <|
                 Element.map AddressFormMsg <|
                     AddressForm.form.view () model.addressForm
-            , Element.el [ Element.width Element.fill ] <|
-                Element.map PersonFormMsg <|
+            , Element.column [ Element.width Element.fill, Element.spacing 20 ]
+                [ Form.getOutput model.personForm.form
+                    |> Maybe.map PersonForm.viewPerson
+                    |> Maybe.withDefault (Element.text "invalid !")
+                , Element.map PersonFormMsg <|
                     PersonForm.form.view () model.personForm
+                ]
             ]
 
 

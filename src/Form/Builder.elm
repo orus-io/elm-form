@@ -56,6 +56,18 @@ type alias FieldViewState customError a stackMsg =
     }
 
 
+type alias FieldListViewState customError a stackMsg =
+    { onAppend : Msg stackMsg
+    , items : List (FieldListItemViewState customError a stackMsg)
+    }
+
+
+type alias FieldListItemViewState customError a stackMsg =
+    { viewstate : FieldViewState customError a stackMsg
+    , onRemove : Msg stackMsg
+    }
+
+
 type alias FieldComponentViewState customError a stackMsg componentModel componentMsg =
     { state : FieldState customError a
     , model : componentModel
@@ -75,6 +87,13 @@ type alias FieldValidate customError a =
     }
 
 
+type alias FieldListValidate customError a =
+    { name : String
+    , valid : Validation customError (List a)
+    , validOrEmpty : Validation customError (List (Maybe a))
+    }
+
+
 fieldValidate : String -> (Field -> Maybe a) -> FieldValidate customError a
 fieldValidate fieldname fromField =
     { valid =
@@ -88,6 +107,23 @@ fieldValidate fieldname fromField =
             |> Validate.field fieldname
     , name = fieldname
     , fromField = fromField
+    }
+
+
+fieldListValidate : String -> (Field -> Maybe a) -> FieldListValidate customError a
+fieldListValidate fieldname fromField =
+    { valid =
+        fromField
+            >> Maybe.map Ok
+            >> Maybe.withDefault (Err <| Error.value Error.Empty)
+            |> Validate.list
+            |> Validate.field fieldname
+    , validOrEmpty =
+        fromField
+            >> Ok
+            |> Validate.list
+            |> Validate.field fieldname
+    , name = fieldname
     }
 
 
@@ -185,6 +221,55 @@ fieldWithState name (FieldDef fieldload toField fromField) component (Builder { 
         , stack =
             stack
                 |> FieldStack.add name fromField (component (FieldDef fieldload toField fromField))
+        }
+
+
+list :
+    String
+    -> Maybe (output -> List a)
+    -> FieldDef output a
+    -> Builder (FieldListValidate customError a -> validate) (FieldListViewState customError a stackMsg -> view) model customError sharedMsg output stackModel stackMsg topStackMsg
+    -> Builder validate view model customError sharedMsg output stackModel stackMsg topStackMsg
+list name fieldlistload (FieldDef _ toField fromField) (Builder { validate, view, load, stack }) =
+    Builder
+        { load =
+            case fieldlistload of
+                Just l ->
+                    (\d -> ( name, l d |> List.map (toField >> Field.value) |> Field.list )) :: load
+
+                Nothing ->
+                    load
+        , validate = validate <| fieldListValidate name fromField
+        , view =
+            \toStackMsg model state ->
+                let
+                    fieldStates =
+                        Form.getListIndexes name state.form
+                            |> List.map
+                                (\i ->
+                                    Form.getFieldAs fromField (name ++ "." ++ String.fromInt i) state.form
+                                )
+                in
+                view toStackMsg
+                    model
+                    state
+                    { onAppend = FormMsg <| Form.Append name
+                    , items =
+                        fieldStates
+                            |> List.indexedMap
+                                (\i fieldState ->
+                                    { viewstate =
+                                        { state = fieldState
+                                        , onInput = \t value -> FormMsg <| Form.Input fieldState.path t <| toField value
+                                        , onEmpty = \t -> FormMsg <| Form.Input fieldState.path t Field.EmptyField
+                                        , onBlur = FormMsg <| Form.Blur fieldState.path
+                                        , onFocus = FormMsg <| Form.Focus fieldState.path
+                                        }
+                                    , onRemove = FormMsg <| Form.RemoveItem name i
+                                    }
+                                )
+                    }
+        , stack = stack
         }
 
 
