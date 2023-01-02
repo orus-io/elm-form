@@ -7,11 +7,13 @@ import Browser
 import Effect
 import Element
 import LoginForm
+import PersonForm
 
 
 type alias Model =
     { loginForm : LoginForm.FormData
     , addressForm : AddressForm.FormData
+    , personForm : PersonForm.FormData
     }
 
 
@@ -19,6 +21,7 @@ type Msg
     = Noop
     | LoginFormMsg LoginForm.Msg
     | AddressFormMsg AddressForm.Msg
+    | PersonFormMsg PersonForm.Msg
 
 
 init : () -> ( Model, Cmd Msg )
@@ -29,14 +32,19 @@ init flags =
 
         ( addressForm, addressEffect ) =
             AddressForm.form.init () Nothing
+
+        ( personForm, personEffect ) =
+            PersonForm.form.init () Nothing
     in
     ( { loginForm = loginForm
       , addressForm = addressForm
+      , personForm = personForm
       }
     , Effect.toCmd ( always Noop, identity ) <|
         Effect.batch
             [ Effect.map LoginFormMsg loginEffect
             , Effect.map AddressFormMsg addressEffect
+            , Effect.map PersonFormMsg personEffect
             ]
     )
 
@@ -50,6 +58,15 @@ update msg model =
         Noop ->
             ( model, Cmd.none )
 
+        AddressFormMsg subMsg ->
+            let
+                ( addressForm, effect ) =
+                    AddressForm.form.update () subMsg model.addressForm
+            in
+            ( { model | addressForm = addressForm }
+            , Effect.toCmd ( always Noop, AddressFormMsg ) effect
+            )
+
         LoginFormMsg subMsg ->
             let
                 ( loginForm, effect ) =
@@ -59,13 +76,13 @@ update msg model =
             , Effect.toCmd ( always Noop, LoginFormMsg ) effect
             )
 
-        AddressFormMsg subMsg ->
+        PersonFormMsg subMsg ->
             let
-                ( addressForm, effect ) =
-                    AddressForm.form.update () subMsg model.addressForm
+                ( personForm, effect ) =
+                    PersonForm.form.update () subMsg model.personForm
             in
-            ( { model | addressForm = addressForm }
-            , Effect.toCmd ( always Noop, AddressFormMsg ) effect
+            ( { model | personForm = personForm }
+            , Effect.toCmd ( always Noop, PersonFormMsg ) effect
             )
 
 
@@ -85,6 +102,9 @@ view model =
             , Element.el [ Element.width Element.fill ] <|
                 Element.map AddressFormMsg <|
                     AddressForm.form.view () model.addressForm
+            , Element.el [ Element.width Element.fill ] <|
+                Element.map PersonFormMsg <|
+                    PersonForm.form.view () model.personForm
             ]
 
 
