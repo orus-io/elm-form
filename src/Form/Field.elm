@@ -40,7 +40,7 @@ custom toString fromString =
     FieldDef Nothing (toString >> String) (asString >> Maybe.andThen fromString)
 
 
-withInitialValue : (data -> String) -> FieldDef data String -> FieldDef data String
+withInitialValue : (data -> a) -> FieldDef data a -> FieldDef data a
 withInitialValue load (FieldDef _ toField toFieldValue) =
     FieldDef (Just load) toField toFieldValue
 

@@ -51,5 +51,5 @@ form =
             (Field.text
                 |> Field.withInitialValue .password
             )
-        |> Builder.field "remember-me" Field.boolean
+        |> Builder.field "remember-me" (Field.boolean |> Field.withInitialValue .rememberMe)
         |> Builder.finalize
