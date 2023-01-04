@@ -152,7 +152,7 @@ init { validate, view } =
 field :
     String
     -> FieldDef output a
-    -> Builder (FieldValidate customError a -> validate) (FieldViewState customError a stackMsg -> view) model customError sharedMsg output stackModel stackMsg topStackMsg
+    -> Builder (FieldValidate customError a -> validate) (FieldViewState customError a topStackMsg -> view) model customError sharedMsg output stackModel stackMsg topStackMsg
     -> Builder validate view model customError sharedMsg output stackModel stackMsg topStackMsg
 field name (FieldDef fieldload toField fromField) (Builder { validate, view, load, stack }) =
     Builder
