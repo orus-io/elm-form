@@ -14,34 +14,39 @@ import Widgets
 type alias Person =
     { firstname : String
     , lastname : String
-    , address : Address
+    , addressList : List Address
     , phoneNumbers : List String
     }
+
+
+viewAddress : Address -> Element msg
+viewAddress { street, city, zip_code } =
+    Element.text <| street ++ " " ++ city ++ " " ++ zip_code
 
 
 viewPerson : Person -> Element msg
 viewPerson person =
     Element.column [] <|
         (Element.text <| person.firstname ++ " " ++ person.lastname)
-            :: List.map Element.text person.phoneNumbers
+            :: List.concat
+                [ List.map Element.text person.phoneNumbers
+                , List.map viewAddress person.addressList
+                ]
+
+
+type alias StackMsg =
+    Form.FieldStack.Msg ( Int, AddressForm.StackMsg ) ()
 
 
 type alias Msg =
-    Builder.Msg
-        (Form.FieldStack.Msg
-            (Form.FieldStack.Msg
-                (Widgets.DropdownMsg AddressForm.StreetKind)
-                ()
-            )
-            ()
-        )
+    Builder.Msg StackMsg
 
 
 type alias FormData =
     Builder.Model
         String
         Person
-        ( ( Dropdown.State AddressForm.StreetKind, () ), () )
+        ( List ( Dropdown.State AddressForm.StreetKind, () ), () )
 
 
 form =
@@ -62,7 +67,8 @@ form =
                     ]
                     [ Widgets.textInput firstname
                     , Widgets.textInput lastname
-                    , address
+                    , Input.button [] { label = Element.text "Add Address", onPress = Just address.onAppend }
+                    , address.items |> Element.column []
                     , List.map
                         (\item ->
                             Element.row []
@@ -77,6 +83,6 @@ form =
         }
         |> Builder.field "firstname" Field.text
         |> Builder.field "lastname" Field.text
-        |> Builder.group "address" .address AddressForm.group
+        |> Builder.groupList "addressList" .addressList AddressForm.group
         |> Builder.list "phone" (Just .phoneNumbers) Field.text
         |> Builder.finalize

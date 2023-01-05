@@ -4,12 +4,16 @@ module Form.FieldStack exposing
     , Stack
     , add
     , addStack
+    , addStackList
     , init
+    , itempath
+    , path
     )
 
 import Effect exposing (Effect)
 import Form
 import Form.Field exposing (Field)
+import List.Extra as List
 
 
 {-| The Stack Msg type
@@ -56,6 +60,18 @@ path prefix name =
 
     else
         prefix ++ "." ++ name
+
+
+itempath : String -> String -> Int -> String
+itempath prefix name index =
+    (if prefix == "" then
+        name
+
+     else
+        prefix ++ "." ++ name
+    )
+        ++ "."
+        ++ String.fromInt index
 
 
 {-| Add a page to a Stack
@@ -170,6 +186,123 @@ addStack name group previousStack =
         \prefix form ( groupModel, previousModel ) ->
             Sub.batch
                 [ Sub.map CurrentMsg <| group.subscriptions (path prefix name) form groupModel
+                , Sub.map PreviousMsg <| previousStack.subscriptions prefix form previousModel
+                ]
+    }
+
+
+updateAtWithEffect : Int -> (a -> ( a, effect )) -> List a -> ( List a, Maybe effect )
+updateAtWithEffect index update =
+    List.indexedFoldr
+        (\i a ( r, e ) ->
+            if i == index then
+                let
+                    ( newa, effect ) =
+                        update a
+                in
+                ( newa :: r, Just effect )
+
+            else
+                ( a :: r, e )
+        )
+        ( [], Nothing )
+
+
+addStackList :
+    String
+    -> Stack customError output sharedMsg groupModel groupMsg
+    -> Stack customError output sharedMsg previousModel previousMsg
+    -> Stack customError output sharedMsg ( List groupModel, previousModel ) (Msg ( Int, groupMsg ) previousMsg)
+addStackList name group previousStack =
+    let
+        adjustListSize : String -> Form.Form customError output -> List groupModel -> ( List groupModel, Effect sharedMsg (Msg ( Int, groupMsg ) previousMsg) )
+        adjustListSize prefix form groupList =
+            Form.getListIndexes (path prefix name) form
+                |> List.foldl
+                    (\i ( sourceList, modelList, effectList ) ->
+                        case sourceList of
+                            [] ->
+                                let
+                                    ( groupModel, groupEffect ) =
+                                        group.init (itempath prefix name i) form
+                                in
+                                ( [], groupModel :: modelList, Effect.map (Tuple.pair i) groupEffect :: effectList )
+
+                            head :: tail ->
+                                ( tail, head :: modelList, effectList )
+                    )
+                    ( groupList, [], [] )
+                |> (\( _, list, effect ) ->
+                        ( List.reverse list, Effect.batch effect |> Effect.map CurrentMsg )
+                   )
+    in
+    { init =
+        \prefix form ->
+            let
+                ( previousModel, previousEffect ) =
+                    previousStack.init prefix form
+
+                ( groupListModel, groupListEffect ) =
+                    adjustListSize prefix form []
+            in
+            ( ( groupListModel, previousModel )
+            , Effect.batch
+                [ Effect.map PreviousMsg previousEffect
+                , groupListEffect
+                ]
+            )
+    , update =
+        \prefix form msg ( groupListModel, previousModel ) ->
+            case msg of
+                CurrentMsg ( index, groupMsg ) ->
+                    let
+                        ( adjustedList, adjustedListEffect ) =
+                            adjustListSize prefix form groupListModel
+
+                        ( updatedList, updatedListEffect ) =
+                            adjustedList
+                                |> updateAtWithEffect index
+                                    (\groupModel ->
+                                        let
+                                            ( newGroupModel, formMsg, groupEffect ) =
+                                                group.update (itempath prefix name index)
+                                                    form
+                                                    groupMsg
+                                                    groupModel
+                                        in
+                                        ( newGroupModel, ( formMsg, Effect.map (Tuple.pair index) groupEffect ) )
+                                    )
+                    in
+                    ( ( updatedList, previousModel )
+                    , updatedListEffect |> Maybe.andThen Tuple.first
+                    , Effect.batch
+                        [ updatedListEffect
+                            |> Maybe.map (Tuple.second >> Effect.map CurrentMsg)
+                            |> Maybe.withDefault Effect.none
+                        , adjustedListEffect
+                        ]
+                    )
+
+                PreviousMsg previousMsg ->
+                    let
+                        ( newPreviousModel, formMsg, previousEffect ) =
+                            previousStack.update prefix form previousMsg previousModel
+                    in
+                    ( ( groupListModel, newPreviousModel )
+                    , formMsg
+                    , Effect.map PreviousMsg previousEffect
+                    )
+    , subscriptions =
+        \prefix form ( groupListModel, previousModel ) ->
+            Sub.batch
+                [ groupListModel
+                    |> List.indexedMap
+                        (\i groupModel ->
+                            group.subscriptions (itempath prefix name i) form groupModel
+                                |> Sub.map (Tuple.pair i)
+                        )
+                    |> Sub.batch
+                    |> Sub.map CurrentMsg
                 , Sub.map PreviousMsg <| previousStack.subscriptions prefix form previousModel
                 ]
     }

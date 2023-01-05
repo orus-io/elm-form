@@ -7,6 +7,7 @@ import Form.Field as Field exposing (Field, FieldDef(..))
 import Form.FieldStack as FieldStack exposing (Stack)
 import Form.Internal as Internal
 import Form.Validate as Validate exposing (Validation)
+import List.Extra as List
 
 
 type Msg stackMsg
@@ -24,7 +25,7 @@ type Builder validate view model customError sharedMsg output stackModel stackMs
     = Builder
         { load : List (output -> ( String, Field ))
         , validate : validate
-        , view : (stackMsg -> topStackMsg) -> model -> Model customError topOutput stackModel -> view
+        , view : String -> (stackMsg -> topStackMsg) -> model -> Model customError topOutput stackModel -> view
         , stack : Stack customError topOutput sharedMsg stackModel stackMsg
         }
 
@@ -94,6 +95,12 @@ type alias FieldListValidate customError a =
     }
 
 
+type alias GroupListView view stackMsg =
+    { onAppend : Msg stackMsg
+    , items : List view
+    }
+
+
 fieldValidate : String -> (Field -> Maybe a) -> FieldValidate customError a
 fieldValidate fieldname fromField =
     { valid =
@@ -144,7 +151,7 @@ init { validate, view } =
     Builder
         { load = []
         , validate = validate
-        , view = \_ model _ -> view model
+        , view = \_ _ model _ -> view model
         , stack = FieldStack.init
         }
 
@@ -167,12 +174,13 @@ field name (FieldDef fieldload toField fromField) (Builder { validate, view, loa
             \model ->
                 validate model <| fieldValidate name fromField
         , view =
-            \toStackMsg model state ->
+            \path toStackMsg model state ->
                 let
                     fieldState =
-                        Form.getFieldAs fromField name state.form
+                        Form.getFieldAs fromField (FieldStack.path path name) state.form
                 in
-                view toStackMsg
+                view path
+                    toStackMsg
                     model
                     state
                     { state = fieldState
@@ -202,12 +210,13 @@ fieldWithState name (FieldDef fieldload toField fromField) component (Builder { 
                     load
         , validate = \model -> validate model <| fieldValidate name fromField
         , view =
-            \toStackMsg model state ->
+            \path toStackMsg model state ->
                 let
                     fieldState =
-                        Form.getFieldAs fromField name state.form
+                        Form.getFieldAs fromField (FieldStack.path path name) state.form
                 in
-                view (FieldStack.PreviousMsg >> toStackMsg)
+                view path
+                    (FieldStack.PreviousMsg >> toStackMsg)
                     model
                     { form = state.form
                     , stack = Tuple.second state.stack
@@ -243,16 +252,17 @@ list name fieldlistload (FieldDef _ toField fromField) (Builder { validate, view
                     load
         , validate = \model -> validate model <| fieldListValidate name fromField
         , view =
-            \toStackMsg model state ->
+            \path toStackMsg model state ->
                 let
                     fieldStates =
                         Form.getListIndexes name state.form
                             |> List.map
                                 (\i ->
-                                    Form.getFieldAs fromField (name ++ "." ++ String.fromInt i) state.form
+                                    Form.getFieldAs fromField (FieldStack.itempath path name i) state.form
                                 )
                 in
-                view toStackMsg
+                view path
+                    toStackMsg
                     model
                     state
                     { onAppend = FormMsg <| Form.Append name
@@ -299,16 +309,18 @@ group name getGroupData (Builder groupBuilder) (Builder builder) =
 
         -- view : (stackMsg -> topStackMsg) -> model -> Model customError topOutput stackModel -> view
         , view =
-            \toStackMsg model state ->
+            \path toStackMsg model state ->
                 let
                     groupView =
-                        groupBuilder.view (FieldStack.CurrentMsg >> toStackMsg)
+                        groupBuilder.view (FieldStack.path path name)
+                            (FieldStack.CurrentMsg >> toStackMsg)
                             model
                             { form = state.form
                             , stack = Tuple.first state.stack
                             }
                 in
-                builder.view (FieldStack.PreviousMsg >> toStackMsg)
+                builder.view path
+                    (FieldStack.PreviousMsg >> toStackMsg)
                     model
                     { form = state.form
                     , stack = Tuple.second state.stack
@@ -317,6 +329,68 @@ group name getGroupData (Builder groupBuilder) (Builder builder) =
         , stack =
             builder.stack
                 |> FieldStack.addStack name groupBuilder.stack
+        }
+
+
+groupList :
+    String
+    -> (output -> List groupOutput)
+    -> Builder (model -> Validation customError groupOutput) groupView model customError sharedMsg groupOutput groupStackModel groupStackMsg topOutput topStackMsg
+    -> Builder (model -> Validation customError (List groupOutput) -> validate) (GroupListView groupView topStackMsg -> view) model customError sharedMsg output stackModel stackMsg topOutput topStackMsg
+    -> Builder (model -> validate) view model customError sharedMsg output ( List groupStackModel, stackModel ) (FieldStack.Msg ( Int, groupStackMsg ) stackMsg) topOutput topStackMsg
+groupList name getGroupListData (Builder groupBuilder) (Builder builder) =
+    Builder
+        { load =
+            (\data ->
+                ( name
+                , getGroupListData data
+                    |> List.map
+                        (\groupData ->
+                            groupBuilder.load |> List.map (\l -> l groupData) |> Field.group
+                        )
+                    |> Field.list
+                )
+            )
+                :: builder.load
+        , validate =
+            \model ->
+                builder.validate model <|
+                    Validate.field name
+                        (Validate.list (groupBuilder.validate model))
+        , view =
+            \path toStackMsg model state ->
+                let
+                    groupViewList =
+                        Form.getListIndexes (FieldStack.path path name) state.form
+                            |> List.map
+                                (\i ->
+                                    groupBuilder.view
+                                        (FieldStack.itempath path name i)
+                                        (Tuple.pair i >> FieldStack.CurrentMsg >> toStackMsg)
+                                        model
+                                        { form = state.form
+                                        , stack =
+                                            Tuple.first state.stack
+                                                |> List.getAt i
+                                                |> Maybe.withDefault
+                                                    (groupBuilder.stack.init (FieldStack.itempath path name i) state.form
+                                                        |> Tuple.first
+                                                    )
+                                        }
+                                )
+                in
+                builder.view path
+                    (FieldStack.PreviousMsg >> toStackMsg)
+                    model
+                    { form = state.form
+                    , stack = Tuple.second state.stack
+                    }
+                    { onAppend = FormMsg <| Form.Append name
+                    , items = groupViewList
+                    }
+        , stack =
+            builder.stack
+                |> FieldStack.addStackList name groupBuilder.stack
         }
 
 
@@ -376,5 +450,5 @@ finalize (Builder { validate, view, load, stack }) =
             Sub.map StackMsg <| stack.subscriptions "" state.form state.stack
     , view =
         \model form ->
-            view identity model form
+            view "" identity model form
     }
