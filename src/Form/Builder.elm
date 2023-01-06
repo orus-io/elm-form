@@ -80,6 +80,18 @@ type alias FieldComponentViewState customError a stackMsg componentModel compone
     }
 
 
+type alias FieldComponentListViewState customError a stackMsg componentModel compomentMsg =
+    { onAppend : Msg stackMsg
+    , items : List (FieldComponentListItemViewState customError a stackMsg componentModel compomentMsg)
+    }
+
+
+type alias FieldComponentListItemViewState customError a stackMsg componentModel compomentMsg =
+    { viewstate : FieldComponentViewState customError a stackMsg componentModel compomentMsg
+    , onRemove : Msg stackMsg
+    }
+
+
 type alias FieldValidate customError a =
     { valid : Validation customError a
     , validOrEmpty : Validation customError (Maybe a)
@@ -255,7 +267,7 @@ list name fieldlistload (FieldDef _ toField fromField) (Builder { validate, view
             \path toStackMsg model state ->
                 let
                     fieldStates =
-                        Form.getListIndexes name state.form
+                        Form.getListIndexes (FieldStack.path path name) state.form
                             |> List.map
                                 (\i ->
                                     Form.getFieldAs fromField (FieldStack.itempath path name i) state.form
@@ -282,6 +294,65 @@ list name fieldlistload (FieldDef _ toField fromField) (Builder { validate, view
                                 )
                     }
         , stack = stack
+        }
+
+
+listWithState :
+    String
+    -> Maybe (output -> List a)
+    -> FieldDef output a
+    -> (FieldDef output a -> FieldStack.FieldComponent customError a componentModel sharedMsg componentMsg)
+    -> Builder (model -> FieldListValidate customError a -> validate) (FieldComponentListViewState customError a topStackMsg componentModel componentMsg -> view) model customError sharedMsg output stackModel stackMsg topOutput topStackMsg
+    -> Builder (model -> validate) view model customError sharedMsg output ( List componentModel, stackModel ) (FieldStack.Msg ( Int, componentMsg ) stackMsg) topOutput topStackMsg
+listWithState name fieldlistload (FieldDef fieldload toField fromField) component (Builder { validate, view, load, stack }) =
+    Builder
+        { load =
+            case fieldlistload of
+                Just l ->
+                    (\d -> ( name, l d |> List.map (toField >> Field.value) |> Field.list )) :: load
+
+                Nothing ->
+                    load
+        , validate = \model -> validate model <| fieldListValidate name fromField
+        , view =
+            \path toStackMsg model state ->
+                let
+                    fieldStates =
+                        Form.getListIndexes (FieldStack.path path name) state.form
+                            |> List.map
+                                (\i ->
+                                    Form.getFieldAs fromField (FieldStack.itempath path name i) state.form
+                                )
+                in
+                view path
+                    (FieldStack.PreviousMsg >> toStackMsg)
+                    model
+                    { form = state.form, stack = Tuple.second state.stack }
+                    { onAppend = FormMsg <| Form.Append name
+                    , items =
+                        fieldStates
+                            |> List.indexedMap
+                                (\i fieldState ->
+                                    { viewstate =
+                                        { state = fieldState
+                                        , model =
+                                            Tuple.first state.stack
+                                                |> List.getAt i
+                                                |> Maybe.withDefault
+                                                    ((component (FieldDef fieldload toField fromField)).init fieldState |> Tuple.first)
+                                        , onInput = \t value -> FormMsg <| Form.Input fieldState.path t <| toField value
+                                        , onEmpty = \t -> FormMsg <| Form.Input fieldState.path t Field.EmptyField
+                                        , onBlur = FormMsg <| Form.Blur fieldState.path
+                                        , onFocus = FormMsg <| Form.Focus fieldState.path
+                                        , toMsg = Tuple.pair i >> FieldStack.CurrentMsg >> toStackMsg >> StackMsg
+                                        }
+                                    , onRemove = FormMsg <| Form.RemoveItem (FieldStack.path path name) i
+                                    }
+                                )
+                    }
+        , stack =
+            stack
+                |> FieldStack.addList name fromField (component (FieldDef fieldload toField fromField))
         }
 
 

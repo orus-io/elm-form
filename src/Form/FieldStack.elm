@@ -3,6 +3,7 @@ module Form.FieldStack exposing
     , Msg(..)
     , Stack
     , add
+    , addList
     , addStack
     , addStackList
     , init
@@ -134,6 +135,115 @@ add name fromField field previousStack =
             in
             Sub.batch
                 [ Sub.map CurrentMsg <| field.subscriptions fieldstate fieldModel
+                , Sub.map PreviousMsg <| previousStack.subscriptions prefix form previousModel
+                ]
+    }
+
+
+addList :
+    String
+    -> (Field -> Maybe a)
+    -> FieldComponent customError a fieldModel sharedMsg fieldMsg
+    -> Stack customError output sharedMsg previousModel previousMsg
+    -> Stack customError output sharedMsg ( List fieldModel, previousModel ) (Msg ( Int, fieldMsg ) previousMsg)
+addList name fromField field previousStack =
+    let
+        adjustListSize : String -> Form.Form customError output -> List fieldModel -> ( List fieldModel, Effect sharedMsg (Msg ( Int, fieldMsg ) previousMsg) )
+        adjustListSize prefix form groupList =
+            Form.getListIndexes (path prefix name) form
+                |> List.foldl
+                    (\i ( sourceList, modelList, effectList ) ->
+                        case sourceList of
+                            [] ->
+                                let
+                                    fieldstate =
+                                        Form.getFieldAs fromField (itempath prefix name i) form
+
+                                    ( fieldModel, fieldEffect ) =
+                                        field.init fieldstate
+                                in
+                                ( [], fieldModel :: modelList, Effect.map (Tuple.pair i) fieldEffect :: effectList )
+
+                            head :: tail ->
+                                ( tail, head :: modelList, effectList )
+                    )
+                    ( groupList, [], [] )
+                |> (\( _, list, effect ) ->
+                        ( List.reverse list, Effect.batch effect |> Effect.map CurrentMsg )
+                   )
+    in
+    { init =
+        \prefix form ->
+            let
+                ( previousModel, previousEffect ) =
+                    previousStack.init prefix form
+
+                ( fieldListModel, fieldListEffect ) =
+                    adjustListSize prefix form []
+            in
+            ( ( fieldListModel, previousModel )
+            , Effect.batch
+                [ Effect.map PreviousMsg previousEffect
+                , fieldListEffect
+                ]
+            )
+    , update =
+        \prefix form msg ( fieldListModel, previousModel ) ->
+            case msg of
+                CurrentMsg ( index, fieldMsg ) ->
+                    let
+                        ( adjustedList, adjustedListEffect ) =
+                            adjustListSize prefix form fieldListModel
+
+                        ( updatedList, updatedListEffect ) =
+                            adjustedList
+                                |> updateAtWithEffect index
+                                    (\fieldModel ->
+                                        let
+                                            fieldstate =
+                                                Form.getFieldAs fromField (itempath prefix name index) form
+
+                                            ( newFieldModel, formMsg, fieldEffect ) =
+                                                field.update fieldstate fieldMsg fieldModel
+                                        in
+                                        ( newFieldModel, ( formMsg, Effect.map (Tuple.pair index) fieldEffect ) )
+                                    )
+                    in
+                    ( ( updatedList, previousModel )
+                    , updatedListEffect |> Maybe.andThen Tuple.first
+                    , Effect.batch
+                        [ updatedListEffect
+                            |> Maybe.map (Tuple.second >> Effect.map CurrentMsg)
+                            |> Maybe.withDefault Effect.none
+                        , adjustedListEffect
+                        ]
+                    )
+
+                PreviousMsg previousMsg ->
+                    let
+                        ( newPreviousModel, formMsg, previousEffect ) =
+                            previousStack.update prefix form previousMsg previousModel
+                    in
+                    ( ( fieldListModel, newPreviousModel )
+                    , formMsg
+                    , Effect.map PreviousMsg previousEffect
+                    )
+    , subscriptions =
+        \prefix form ( fieldListModel, previousModel ) ->
+            Sub.batch
+                [ adjustListSize prefix form fieldListModel
+                    |> Tuple.first
+                    |> List.indexedMap
+                        (\i fieldModel ->
+                            let
+                                fieldState =
+                                    Form.getFieldAs fromField (itempath prefix name i) form
+                            in
+                            field.subscriptions fieldState fieldModel
+                                |> Sub.map (Tuple.pair i)
+                        )
+                    |> Sub.batch
+                    |> Sub.map CurrentMsg
                 , Sub.map PreviousMsg <| previousStack.subscriptions prefix form previousModel
                 ]
     }
