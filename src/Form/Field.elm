@@ -1,7 +1,7 @@
 module Form.Field exposing
     ( Field, FieldValue(..), value, string, bool, group, list, custom
     , asString, asBool
-    , FieldDef(..), boolean, text, withInitialValue
+    , FieldDef(..), boolean, file, text, withInitialValue
     )
 
 {-| Read and write field values.
@@ -18,6 +18,7 @@ module Form.Field exposing
 
 -}
 
+import File exposing (File)
 import Form.Tree as Tree exposing (Tree)
 
 
@@ -33,6 +34,11 @@ text =
 boolean : FieldDef data Bool
 boolean =
     FieldDef Nothing Bool asBool
+
+
+file : FieldDef data File
+file =
+    FieldDef Nothing File asFile
 
 
 custom : (option -> String) -> (String -> Maybe option) -> FieldDef data option
@@ -56,6 +62,7 @@ type alias Field =
 type FieldValue
     = String String
     | Bool Bool
+    | File File
     | EmptyField
 
 
@@ -100,6 +107,18 @@ asBool : Field -> Maybe Bool
 asBool field =
     case field of
         Tree.Value (Bool b) ->
+            Just b
+
+        _ ->
+            Nothing
+
+
+{-| Get field value as file.
+-}
+asFile : Field -> Maybe File
+asFile field =
+    case field of
+        Tree.Value (File b) ->
             Just b
 
         _ ->
