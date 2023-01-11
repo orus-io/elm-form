@@ -4,7 +4,6 @@ import Dropdown
 import Element exposing (Element)
 import Element.Input as Input
 import Enum exposing (Enum)
-import Form exposing (Form)
 import Form.Builder as Builder exposing (Builder)
 import Form.Field as Field
 import Form.FieldStack
@@ -70,7 +69,6 @@ group :
         data
         ( Dropdown.State StreetKind, () )
         StackMsg
-        topOutput
         topStackMsg
 group =
     Builder.init

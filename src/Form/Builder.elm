@@ -1,7 +1,7 @@
 module Form.Builder exposing (..)
 
 import Effect exposing (Effect)
-import Form exposing (FieldState, Form(..), InputType, getAnyAt, getField)
+import Form.Data as Data exposing (FieldState, InputType, getAnyAt, getField)
 import Form.Error as Error
 import Form.Field as Field exposing (Field, FieldDef(..))
 import Form.FieldStack as FieldStack exposing (Stack)
@@ -11,23 +11,30 @@ import List.Extra as List
 
 
 type Msg stackMsg
-    = FormMsg Form.Msg
+    = DataMsg Data.Msg
     | StackMsg stackMsg
 
 
-type alias Model customError output stackModel =
-    { form : Form customError output
+type alias BuilderModel customError stackModel =
+    { formData : Data.Model customError
     , stack : stackModel
     }
 
 
-type Builder validate view model customError sharedMsg output stackModel stackMsg topOutput topStackMsg
+type Builder validate view model customError sharedMsg output stackModel stackMsg topStackMsg
     = Builder
         { load : List (output -> ( String, Field ))
         , validate : validate
-        , view : String -> (stackMsg -> topStackMsg) -> model -> Model customError topOutput stackModel -> view
-        , stack : Stack customError topOutput sharedMsg stackModel stackMsg
+        , view : String -> (stackMsg -> topStackMsg) -> model -> BuilderModel customError stackModel -> view
+        , stack : Stack customError sharedMsg stackModel stackMsg
         }
+
+
+type alias Model customError output stackModel =
+    { formData : Data.Model customError
+    , output: Maybe output
+    , stack : stackModel
+    }
 
 
 type alias FormDef customError output sharedMsg model view stackModel stackMsg =
@@ -38,14 +45,14 @@ type alias FormDef customError output sharedMsg model view stackModel stackMsg =
     }
 
 
-onInput : FieldDef output a -> InputType -> FieldState customError a -> a -> Form.Msg
+onInput : FieldDef output a -> InputType -> FieldState customError a -> a -> Data.Msg
 onInput (FieldDef _ toFieldValue _) inputType { path } value =
-    Form.Input path inputType (toFieldValue value)
+    Data.Input path inputType (toFieldValue value)
 
 
-onEmpty : InputType -> FieldState customError a -> Form.Msg
+onEmpty : InputType -> FieldState customError a -> Data.Msg
 onEmpty inputType { path } =
-    Form.Input path inputType Field.EmptyField
+    Data.Input path inputType Field.EmptyField
 
 
 type alias FieldViewState customError a stackMsg =
@@ -158,7 +165,7 @@ andThen filter fieldv =
 
 init :
     { validate : model -> validate, view : model -> view }
-    -> Builder (model -> validate) view model customError sharedMsg output () () topOutput topStackMsg
+    -> Builder (model -> validate) view model customError sharedMsg output () () topStackMsg
 init { validate, view } =
     Builder
         { load = []
@@ -171,8 +178,8 @@ init { validate, view } =
 field :
     String
     -> FieldDef output a
-    -> Builder (model -> FieldValidate customError a -> validate) (FieldViewState customError a topStackMsg -> view) model customError sharedMsg output stackModel stackMsg topOutput topStackMsg
-    -> Builder (model -> validate) view model customError sharedMsg output stackModel stackMsg topOutput topStackMsg
+    -> Builder (model -> FieldValidate customError a -> validate) (FieldViewState customError a topStackMsg -> view) model customError sharedMsg output stackModel stackMsg topStackMsg
+    -> Builder (model -> validate) view model customError sharedMsg output stackModel stackMsg topStackMsg
 field name (FieldDef fieldload toField fromField) (Builder { validate, view, load, stack }) =
     Builder
         { load =
@@ -189,17 +196,17 @@ field name (FieldDef fieldload toField fromField) (Builder { validate, view, loa
             \path toStackMsg model state ->
                 let
                     fieldState =
-                        Form.getFieldAs fromField (FieldStack.path path name) state.form
+                        Data.getFieldAs fromField (FieldStack.path path name) state.formData
                 in
                 view path
                     toStackMsg
                     model
                     state
                     { state = fieldState
-                    , onInput = \t value -> FormMsg <| Form.Input fieldState.path t <| toField value
-                    , onEmpty = \t -> FormMsg <| Form.Input fieldState.path t Field.EmptyField
-                    , onBlur = FormMsg <| Form.Blur fieldState.path
-                    , onFocus = FormMsg <| Form.Focus fieldState.path
+                    , onInput = \t value -> DataMsg <| Data.Input fieldState.path t <| toField value
+                    , onEmpty = \t -> DataMsg <| Data.Input fieldState.path t Field.EmptyField
+                    , onBlur = DataMsg <| Data.Blur fieldState.path
+                    , onFocus = DataMsg <| Data.Focus fieldState.path
                     }
         , stack = stack
         }
@@ -209,8 +216,8 @@ fieldWithState :
     String
     -> FieldDef output a
     -> (FieldDef output a -> FieldStack.FieldComponent customError a componentModel sharedMsg componentMsg)
-    -> Builder (model -> FieldValidate customError a -> validate) (FieldComponentViewState customError a topStackMsg componentModel componentMsg -> view) model customError sharedMsg output stackModel stackMsg topOutput topStackMsg
-    -> Builder (model -> validate) view model customError sharedMsg output ( componentModel, stackModel ) (FieldStack.Msg componentMsg stackMsg) topOutput topStackMsg
+    -> Builder (model -> FieldValidate customError a -> validate) (FieldComponentViewState customError a topStackMsg componentModel componentMsg -> view) model customError sharedMsg output stackModel stackMsg topStackMsg
+    -> Builder (model -> validate) view model customError sharedMsg output ( componentModel, stackModel ) (FieldStack.Msg componentMsg stackMsg) topStackMsg
 fieldWithState name (FieldDef fieldload toField fromField) component (Builder { validate, view, load, stack }) =
     Builder
         { load =
@@ -225,20 +232,20 @@ fieldWithState name (FieldDef fieldload toField fromField) component (Builder { 
             \path toStackMsg model state ->
                 let
                     fieldState =
-                        Form.getFieldAs fromField (FieldStack.path path name) state.form
+                        Data.getFieldAs fromField (FieldStack.path path name) state.formData
                 in
                 view path
                     (FieldStack.PreviousMsg >> toStackMsg)
                     model
-                    { form = state.form
+                    { formData = state.formData
                     , stack = Tuple.second state.stack
                     }
                     { state = fieldState
                     , model = Tuple.first state.stack
-                    , onInput = \t value -> FormMsg <| Form.Input fieldState.path t <| toField value
-                    , onEmpty = \t -> FormMsg <| Form.Input fieldState.path t Field.EmptyField
-                    , onBlur = FormMsg <| Form.Blur fieldState.path
-                    , onFocus = FormMsg <| Form.Focus fieldState.path
+                    , onInput = \t value -> DataMsg <| Data.Input fieldState.path t <| toField value
+                    , onEmpty = \t -> DataMsg <| Data.Input fieldState.path t Field.EmptyField
+                    , onBlur = DataMsg <| Data.Blur fieldState.path
+                    , onFocus = DataMsg <| Data.Focus fieldState.path
                     , toMsg = FieldStack.CurrentMsg >> toStackMsg >> StackMsg
                     }
         , stack =
@@ -251,8 +258,8 @@ list :
     String
     -> Maybe (output -> List a)
     -> FieldDef output a
-    -> Builder (model -> FieldListValidate customError a -> validate) (FieldListViewState customError a topStackMsg -> view) model customError sharedMsg output stackModel stackMsg topOutput topStackMsg
-    -> Builder (model -> validate) view model customError sharedMsg output stackModel stackMsg topOutput topStackMsg
+    -> Builder (model -> FieldListValidate customError a -> validate) (FieldListViewState customError a topStackMsg -> view) model customError sharedMsg output stackModel stackMsg topStackMsg
+    -> Builder (model -> validate) view model customError sharedMsg output stackModel stackMsg topStackMsg
 list name fieldlistload (FieldDef _ toField fromField) (Builder { validate, view, load, stack }) =
     Builder
         { load =
@@ -267,29 +274,29 @@ list name fieldlistload (FieldDef _ toField fromField) (Builder { validate, view
             \path toStackMsg model state ->
                 let
                     fieldStates =
-                        Form.getListIndexes (FieldStack.path path name) state.form
+                        Data.getListIndexes (FieldStack.path path name) state.formData
                             |> List.map
                                 (\i ->
-                                    Form.getFieldAs fromField (FieldStack.itempath path name i) state.form
+                                    Data.getFieldAs fromField (FieldStack.itempath path name i) state.formData
                                 )
                 in
                 view path
                     toStackMsg
                     model
                     state
-                    { onAppend = FormMsg <| Form.Append name
+                    { onAppend = DataMsg <| Data.Append name
                     , items =
                         fieldStates
                             |> List.indexedMap
                                 (\i fieldState ->
                                     { viewstate =
                                         { state = fieldState
-                                        , onInput = \t value -> FormMsg <| Form.Input fieldState.path t <| toField value
-                                        , onEmpty = \t -> FormMsg <| Form.Input fieldState.path t Field.EmptyField
-                                        , onBlur = FormMsg <| Form.Blur fieldState.path
-                                        , onFocus = FormMsg <| Form.Focus fieldState.path
+                                        , onInput = \t value -> DataMsg <| Data.Input fieldState.path t <| toField value
+                                        , onEmpty = \t -> DataMsg <| Data.Input fieldState.path t Field.EmptyField
+                                        , onBlur = DataMsg <| Data.Blur fieldState.path
+                                        , onFocus = DataMsg <| Data.Focus fieldState.path
                                         }
-                                    , onRemove = FormMsg <| Form.RemoveItem name i
+                                    , onRemove = DataMsg <| Data.RemoveItem name i
                                     }
                                 )
                     }
@@ -302,8 +309,8 @@ listWithState :
     -> Maybe (output -> List a)
     -> FieldDef output a
     -> (FieldDef output a -> FieldStack.FieldComponent customError a componentModel sharedMsg componentMsg)
-    -> Builder (model -> FieldListValidate customError a -> validate) (FieldComponentListViewState customError a topStackMsg componentModel componentMsg -> view) model customError sharedMsg output stackModel stackMsg topOutput topStackMsg
-    -> Builder (model -> validate) view model customError sharedMsg output ( List componentModel, stackModel ) (FieldStack.Msg ( Int, componentMsg ) stackMsg) topOutput topStackMsg
+    -> Builder (model -> FieldListValidate customError a -> validate) (FieldComponentListViewState customError a topStackMsg componentModel componentMsg -> view) model customError sharedMsg output stackModel stackMsg topStackMsg
+    -> Builder (model -> validate) view model customError sharedMsg output ( List componentModel, stackModel ) (FieldStack.Msg ( Int, componentMsg ) stackMsg) topStackMsg
 listWithState name fieldlistload (FieldDef fieldload toField fromField) component (Builder { validate, view, load, stack }) =
     Builder
         { load =
@@ -318,17 +325,17 @@ listWithState name fieldlistload (FieldDef fieldload toField fromField) componen
             \path toStackMsg model state ->
                 let
                     fieldStates =
-                        Form.getListIndexes (FieldStack.path path name) state.form
+                        Data.getListIndexes (FieldStack.path path name) state.formData
                             |> List.map
                                 (\i ->
-                                    Form.getFieldAs fromField (FieldStack.itempath path name i) state.form
+                                    Data.getFieldAs fromField (FieldStack.itempath path name i) state.formData
                                 )
                 in
                 view path
                     (FieldStack.PreviousMsg >> toStackMsg)
                     model
-                    { form = state.form, stack = Tuple.second state.stack }
-                    { onAppend = FormMsg <| Form.Append name
+                    { formData = state.formData, stack = Tuple.second state.stack }
+                    { onAppend = DataMsg <| Data.Append name
                     , items =
                         fieldStates
                             |> List.indexedMap
@@ -340,13 +347,13 @@ listWithState name fieldlistload (FieldDef fieldload toField fromField) componen
                                                 |> List.getAt i
                                                 |> Maybe.withDefault
                                                     ((component (FieldDef fieldload toField fromField)).init fieldState |> Tuple.first)
-                                        , onInput = \t value -> FormMsg <| Form.Input fieldState.path t <| toField value
-                                        , onEmpty = \t -> FormMsg <| Form.Input fieldState.path t Field.EmptyField
-                                        , onBlur = FormMsg <| Form.Blur fieldState.path
-                                        , onFocus = FormMsg <| Form.Focus fieldState.path
+                                        , onInput = \t value -> DataMsg <| Data.Input fieldState.path t <| toField value
+                                        , onEmpty = \t -> DataMsg <| Data.Input fieldState.path t Field.EmptyField
+                                        , onBlur = DataMsg <| Data.Blur fieldState.path
+                                        , onFocus = DataMsg <| Data.Focus fieldState.path
                                         , toMsg = Tuple.pair i >> FieldStack.CurrentMsg >> toStackMsg >> StackMsg
                                         }
-                                    , onRemove = FormMsg <| Form.RemoveItem (FieldStack.path path name) i
+                                    , onRemove = DataMsg <| Data.RemoveItem (FieldStack.path path name) i
                                     }
                                 )
                     }
@@ -359,9 +366,9 @@ listWithState name fieldlistload (FieldDef fieldload toField fromField) componen
 group :
     String
     -> (output -> groupOutput)
-    -> Builder (model -> Validation customError groupOutput) groupView model customError sharedMsg groupOutput groupStackModel groupStackMsg topOutput topStackMsg
-    -> Builder (model -> Validation customError groupOutput -> validate) (groupView -> view) model customError sharedMsg output stackModel stackMsg topOutput topStackMsg
-    -> Builder (model -> validate) view model customError sharedMsg output ( groupStackModel, stackModel ) (FieldStack.Msg groupStackMsg stackMsg) topOutput topStackMsg
+    -> Builder (model -> Validation customError groupOutput) groupView model customError sharedMsg groupOutput groupStackModel groupStackMsg topStackMsg
+    -> Builder (model -> Validation customError groupOutput -> validate) (groupView -> view) model customError sharedMsg output stackModel stackMsg topStackMsg
+    -> Builder (model -> validate) view model customError sharedMsg output ( groupStackModel, stackModel ) (FieldStack.Msg groupStackMsg stackMsg) topStackMsg
 group name getGroupData (Builder groupBuilder) (Builder builder) =
     Builder
         { load =
@@ -378,7 +385,7 @@ group name getGroupData (Builder groupBuilder) (Builder builder) =
                 builder.validate model <|
                     Validate.field name (groupBuilder.validate model)
 
-        -- view : (stackMsg -> topStackMsg) -> model -> Model customError topOutput stackModel -> view
+        -- view : (stackMsg -> topStackMsg) -> model -> Model customError stackModel -> view
         , view =
             \path toStackMsg model state ->
                 let
@@ -386,14 +393,14 @@ group name getGroupData (Builder groupBuilder) (Builder builder) =
                         groupBuilder.view (FieldStack.path path name)
                             (FieldStack.CurrentMsg >> toStackMsg)
                             model
-                            { form = state.form
+                            { formData = state.formData
                             , stack = Tuple.first state.stack
                             }
                 in
                 builder.view path
                     (FieldStack.PreviousMsg >> toStackMsg)
                     model
-                    { form = state.form
+                    { formData = state.formData
                     , stack = Tuple.second state.stack
                     }
                     groupView
@@ -406,9 +413,9 @@ group name getGroupData (Builder groupBuilder) (Builder builder) =
 groupList :
     String
     -> (output -> List groupOutput)
-    -> Builder (model -> Validation customError groupOutput) groupView model customError sharedMsg groupOutput groupStackModel groupStackMsg topOutput topStackMsg
-    -> Builder (model -> Validation customError (List groupOutput) -> validate) (GroupListView groupView topStackMsg -> view) model customError sharedMsg output stackModel stackMsg topOutput topStackMsg
-    -> Builder (model -> validate) view model customError sharedMsg output ( List groupStackModel, stackModel ) (FieldStack.Msg ( Int, groupStackMsg ) stackMsg) topOutput topStackMsg
+    -> Builder (model -> Validation customError groupOutput) groupView model customError sharedMsg groupOutput groupStackModel groupStackMsg topStackMsg
+    -> Builder (model -> Validation customError (List groupOutput) -> validate) (GroupListView groupView topStackMsg -> view) model customError sharedMsg output stackModel stackMsg topStackMsg
+    -> Builder (model -> validate) view model customError sharedMsg output ( List groupStackModel, stackModel ) (FieldStack.Msg ( Int, groupStackMsg ) stackMsg) topStackMsg
 groupList name getGroupListData (Builder groupBuilder) (Builder builder) =
     Builder
         { load =
@@ -432,19 +439,19 @@ groupList name getGroupListData (Builder groupBuilder) (Builder builder) =
             \path toStackMsg model state ->
                 let
                     groupViewList =
-                        Form.getListIndexes (FieldStack.path path name) state.form
+                        Data.getListIndexes (FieldStack.path path name) state.formData
                             |> List.map
                                 (\i ->
                                     groupBuilder.view
                                         (FieldStack.itempath path name i)
                                         (Tuple.pair i >> FieldStack.CurrentMsg >> toStackMsg)
                                         model
-                                        { form = state.form
+                                        { formData = state.formData
                                         , stack =
                                             Tuple.first state.stack
                                                 |> List.getAt i
                                                 |> Maybe.withDefault
-                                                    (groupBuilder.stack.init (FieldStack.itempath path name i) state.form
+                                                    (groupBuilder.stack.init (FieldStack.itempath path name i) state.formData
                                                         |> Tuple.first
                                                     )
                                         }
@@ -453,10 +460,10 @@ groupList name getGroupListData (Builder groupBuilder) (Builder builder) =
                 builder.view path
                     (FieldStack.PreviousMsg >> toStackMsg)
                     model
-                    { form = state.form
+                    { formData = state.formData
                     , stack = Tuple.second state.stack
                     }
-                    { onAppend = FormMsg <| Form.Append name
+                    { onAppend = DataMsg <| Data.Append name
                     , items = groupViewList
                     }
         , stack =
@@ -466,14 +473,14 @@ groupList name getGroupListData (Builder groupBuilder) (Builder builder) =
 
 
 finalize :
-    Builder (model -> Validation customError output) view model customError sharedMsg output stackModel stackMsg output stackMsg
+    Builder (model -> Validation customError output) view model customError sharedMsg output stackModel stackMsg stackMsg
     -> FormDef customError output sharedMsg model view stackModel stackMsg
 finalize (Builder { validate, view, load, stack }) =
     { init =
         \model initial ->
             let
-                formState =
-                    Form.initial
+                (formData, output) =
+                    Data.initial
                         (initial
                             |> Maybe.map (\data -> load |> List.map (\l -> l data))
                             |> Maybe.withDefault []
@@ -481,9 +488,10 @@ finalize (Builder { validate, view, load, stack }) =
                         (validate model)
 
                 ( stackModel, stackEffect ) =
-                    stack.init "" formState
+                    stack.init "" formData
             in
-            ( { form = formState
+            ( { formData = formData
+              , output = output |> Maybe.withDefault Nothing
               , stack = stackModel
               }
             , Effect.map StackMsg stackEffect
@@ -491,35 +499,42 @@ finalize (Builder { validate, view, load, stack }) =
     , update =
         \model msg state ->
             case msg of
-                FormMsg formMsg ->
+                DataMsg formMsg ->
+                    let
+                        ( newData, newOutput ) =
+                            Data.update (validate model) formMsg state.formData
+                    in
                     ( { state
-                        | form = Form.update (validate model) formMsg state.form
+                        | formData = newData
+                        , output = newOutput |> Maybe.withDefault state.output
                       }
                     , Effect.none
                     )
 
                 StackMsg stackMsg ->
                     let
-                        ( nextStack, maybeFormMsg, stackEffect ) =
-                            stack.update "" state.form stackMsg state.stack
+                        ( nextStack, maybeDataMsg, stackEffect ) =
+                            stack.update "" state.formData stackMsg state.stack
 
-                        nextForm =
-                            case maybeFormMsg of
+                        (nextData, nextOutput) =
+                            case maybeDataMsg of
                                 Just formMsg ->
-                                    Form.update (validate model) formMsg state.form
+                                    Data.update (validate model) formMsg state.formData
+                                    |> Tuple.mapSecond (Maybe.withDefault state.output)
 
                                 Nothing ->
-                                    state.form
+                                    (state.formData, state.output)
                     in
                     ( { stack = nextStack
-                      , form = nextForm
+                      , formData = nextData
+                      , output = nextOutput
                       }
                     , Effect.map StackMsg stackEffect
                     )
     , subscriptions =
         \_ state ->
-            Sub.map StackMsg <| stack.subscriptions "" state.form state.stack
+            Sub.map StackMsg <| stack.subscriptions "" state.formData state.stack
     , view =
-        \model form ->
-            view "" identity model form
+        \model state ->
+            view "" identity model { formData = state.formData, stack = state.stack }
     }

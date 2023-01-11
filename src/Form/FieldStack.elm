@@ -12,7 +12,7 @@ module Form.FieldStack exposing
     )
 
 import Effect exposing (Effect)
-import Form
+import Form.Data as Data
 import Form.Field exposing (Field)
 import List.Extra as List
 
@@ -26,17 +26,17 @@ type Msg current previous
 
 {-| A Stack combines fields into a single TEA component
 -}
-type alias Stack customError output sharedMsg model msg =
-    { init : String -> Form.Form customError output -> ( model, Effect sharedMsg msg )
-    , update : String -> Form.Form customError output -> msg -> model -> ( model, Maybe Form.Msg, Effect sharedMsg msg )
-    , subscriptions : String -> Form.Form customError output -> model -> Sub msg
+type alias Stack customError sharedMsg model msg =
+    { init : String -> Data.Model customError -> ( model, Effect sharedMsg msg )
+    , update : String -> Data.Model customError -> msg -> model -> ( model, Maybe Data.Msg, Effect sharedMsg msg )
+    , subscriptions : String -> Data.Model customError -> model -> Sub msg
     }
 
 
 type alias FieldComponent customError a model sharedMsg msg =
-    { init : Form.FieldState customError a -> ( model, Effect sharedMsg msg )
-    , update : Form.FieldState customError a -> msg -> model -> ( model, Maybe Form.Msg, Effect sharedMsg msg )
-    , subscriptions : Form.FieldState customError a -> model -> Sub msg
+    { init : Data.FieldState customError a -> ( model, Effect sharedMsg msg )
+    , update : Data.FieldState customError a -> msg -> model -> ( model, Maybe Data.Msg, Effect sharedMsg msg )
+    , subscriptions : Data.FieldState customError a -> model -> Sub msg
     }
 
 
@@ -46,7 +46,7 @@ The defaultView is used when no other view can be applied, which should never
 happen if the application is properly defined.
 
 -}
-init : Stack customError output sharedMsg () ()
+init : Stack customError sharedMsg () ()
 init =
     { init = \_ _ -> ( (), Effect.none )
     , update = \_ _ () () -> ( (), Nothing, Effect.none )
@@ -81,14 +81,14 @@ add :
     String
     -> (Field -> Maybe a)
     -> FieldComponent customError a fieldModel sharedMsg fieldMsg
-    -> Stack customError output sharedMsg previousModel previousMsg
-    -> Stack customError output sharedMsg ( fieldModel, previousModel ) (Msg fieldMsg previousMsg)
+    -> Stack customError sharedMsg previousModel previousMsg
+    -> Stack customError sharedMsg ( fieldModel, previousModel ) (Msg fieldMsg previousMsg)
 add name fromField field previousStack =
     { init =
         \prefix form ->
             let
                 fieldstate =
-                    Form.getFieldAs fromField (path prefix name) form
+                    Data.getFieldAs fromField (path prefix name) form
 
                 ( fieldModel, fieldEffect ) =
                     field.init fieldstate
@@ -108,7 +108,7 @@ add name fromField field previousStack =
                 CurrentMsg fieldMsg ->
                     let
                         fieldstate =
-                            Form.getFieldAs fromField (path prefix name) form
+                            Data.getFieldAs fromField (path prefix name) form
 
                         ( newFieldModel, formMsg, fieldEffect ) =
                             field.update fieldstate fieldMsg fieldModel
@@ -131,7 +131,7 @@ add name fromField field previousStack =
         \prefix form ( fieldModel, previousModel ) ->
             let
                 fieldstate =
-                    Form.getFieldAs fromField (path prefix name) form
+                    Data.getFieldAs fromField (path prefix name) form
             in
             Sub.batch
                 [ Sub.map CurrentMsg <| field.subscriptions fieldstate fieldModel
@@ -144,20 +144,20 @@ addList :
     String
     -> (Field -> Maybe a)
     -> FieldComponent customError a fieldModel sharedMsg fieldMsg
-    -> Stack customError output sharedMsg previousModel previousMsg
-    -> Stack customError output sharedMsg ( List fieldModel, previousModel ) (Msg ( Int, fieldMsg ) previousMsg)
+    -> Stack customError sharedMsg previousModel previousMsg
+    -> Stack customError sharedMsg ( List fieldModel, previousModel ) (Msg ( Int, fieldMsg ) previousMsg)
 addList name fromField field previousStack =
     let
-        adjustListSize : String -> Form.Form customError output -> List fieldModel -> ( List fieldModel, Effect sharedMsg (Msg ( Int, fieldMsg ) previousMsg) )
+        adjustListSize : String -> Data.Model customError -> List fieldModel -> ( List fieldModel, Effect sharedMsg (Msg ( Int, fieldMsg ) previousMsg) )
         adjustListSize prefix form groupList =
-            Form.getListIndexes (path prefix name) form
+            Data.getListIndexes (path prefix name) form
                 |> List.foldl
                     (\i ( sourceList, modelList, effectList ) ->
                         case sourceList of
                             [] ->
                                 let
                                     fieldstate =
-                                        Form.getFieldAs fromField (itempath prefix name i) form
+                                        Data.getFieldAs fromField (itempath prefix name i) form
 
                                     ( fieldModel, fieldEffect ) =
                                         field.init fieldstate
@@ -201,7 +201,7 @@ addList name fromField field previousStack =
                                     (\fieldModel ->
                                         let
                                             fieldstate =
-                                                Form.getFieldAs fromField (itempath prefix name index) form
+                                                Data.getFieldAs fromField (itempath prefix name index) form
 
                                             ( newFieldModel, formMsg, fieldEffect ) =
                                                 field.update fieldstate fieldMsg fieldModel
@@ -237,7 +237,7 @@ addList name fromField field previousStack =
                         (\i fieldModel ->
                             let
                                 fieldState =
-                                    Form.getFieldAs fromField (itempath prefix name i) form
+                                    Data.getFieldAs fromField (itempath prefix name i) form
                             in
                             field.subscriptions fieldState fieldModel
                                 |> Sub.map (Tuple.pair i)
@@ -251,9 +251,9 @@ addList name fromField field previousStack =
 
 addStack :
     String
-    -> Stack customError output sharedMsg groupModel groupMsg
-    -> Stack customError output sharedMsg previousModel previousMsg
-    -> Stack customError output sharedMsg ( groupModel, previousModel ) (Msg groupMsg previousMsg)
+    -> Stack customError sharedMsg groupModel groupMsg
+    -> Stack customError sharedMsg previousModel previousMsg
+    -> Stack customError sharedMsg ( groupModel, previousModel ) (Msg groupMsg previousMsg)
 addStack name group previousStack =
     { init =
         \prefix form ->
@@ -320,14 +320,14 @@ updateAtWithEffect index update =
 
 addStackList :
     String
-    -> Stack customError output sharedMsg groupModel groupMsg
-    -> Stack customError output sharedMsg previousModel previousMsg
-    -> Stack customError output sharedMsg ( List groupModel, previousModel ) (Msg ( Int, groupMsg ) previousMsg)
+    -> Stack customError sharedMsg groupModel groupMsg
+    -> Stack customError sharedMsg previousModel previousMsg
+    -> Stack customError sharedMsg ( List groupModel, previousModel ) (Msg ( Int, groupMsg ) previousMsg)
 addStackList name group previousStack =
     let
-        adjustListSize : String -> Form.Form customError output -> List groupModel -> ( List groupModel, Effect sharedMsg (Msg ( Int, groupMsg ) previousMsg) )
+        adjustListSize : String -> Data.Model customError -> List groupModel -> ( List groupModel, Effect sharedMsg (Msg ( Int, groupMsg ) previousMsg) )
         adjustListSize prefix form groupList =
-            Form.getListIndexes (path prefix name) form
+            Data.getListIndexes (path prefix name) form
                 |> List.foldl
                     (\i ( sourceList, modelList, effectList ) ->
                         case sourceList of

@@ -5,7 +5,6 @@ module Main exposing (..)
 import Browser
 import Effect
 import Element
-import Form
 import LoginForm
 import PersonForm
 
@@ -84,7 +83,7 @@ view model =
                 Element.map LoginFormMsg <|
                     LoginForm.form.view () model.loginForm
             , Element.column [ Element.width Element.fill, Element.spacing 20 ]
-                [ Form.getOutput model.personForm.form
+                [ model.personForm.output
                     |> Maybe.map PersonForm.viewPerson
                     |> Maybe.withDefault (Element.text "invalid !")
                 , Element.map PersonFormMsg <|

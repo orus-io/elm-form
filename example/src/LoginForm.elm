@@ -1,7 +1,6 @@
 module LoginForm exposing (..)
 
 import Element
-import Form exposing (Form)
 import Form.Builder as Builder
 import Form.Field as Field
 import Form.Validate as Validate

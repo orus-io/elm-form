@@ -5,7 +5,7 @@ import Effect
 import Element exposing (Attribute, Element)
 import Element.Events as Events
 import Element.Input as Input
-import Form
+import Form.Data as Form
 import Form.Builder as Builder
 import Form.Field
 import Form.FieldStack as FieldStack
