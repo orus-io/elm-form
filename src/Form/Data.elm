@@ -2,6 +2,7 @@
 module Form.Data exposing (..)
 
 import Dict exposing (Dict)
+import Form.InputType as InputType exposing(InputType)
 import Form.Error as Error exposing (Error, ErrorValue)
 import Form.Field as Field exposing (Field, FieldDef(..), FieldValue)
 import Form.Tree as Tree
@@ -137,15 +138,6 @@ type Msg
     | Reset (List ( String, Field ))
 
 
-{-| Input types to determine live validation behaviour.
--}
-type InputType
-    = Text
-    | Textarea
-    | Select
-    | Radio
-    | Checkbox
-
 
 {-| Update form state with the given message
 -}
@@ -179,10 +171,10 @@ update validation msg model  =
 
                 isDirty =
                     case inputType of
-                        Text ->
+                        InputType.Text ->
                             True
 
-                        Textarea ->
+                        InputType.Textarea ->
                             True
 
                         _ ->

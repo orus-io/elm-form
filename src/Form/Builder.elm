@@ -1,7 +1,8 @@
 module Form.Builder exposing (..)
 
 import Effect exposing (Effect)
-import Form.Data as Data exposing (FieldState, InputType, getAnyAt, getField)
+import Form.Data as Data exposing (FieldState, getAnyAt, getField)
+import Form.InputType as InputType exposing (InputType)
 import Form.Error as Error
 import Form.Field as Field exposing (Field, FieldDef(..))
 import Form.FieldStack as FieldStack exposing (Stack)

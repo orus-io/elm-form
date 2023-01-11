@@ -5,7 +5,7 @@ import Effect
 import Element exposing (Attribute, Element)
 import Element.Events as Events
 import Element.Input as Input
-import Form.Data as Form
+import Form.InputType as InputType
 import Form.Builder as Builder
 import Form.Field
 import Form.FieldStack as FieldStack
@@ -17,7 +17,7 @@ textInput { state, onInput, onFocus, onBlur } =
         [ Events.onFocus onFocus
         , Events.onLoseFocus onBlur
         ]
-        { onChange = onInput Form.Text
+        { onChange = onInput InputType.Text
         , text = state.value |> Maybe.withDefault ""
         , label = Input.labelHidden ""
         , placeholder = Nothing
@@ -30,7 +30,7 @@ checkbox { state, onFocus, onBlur, onInput } =
         [ Events.onFocus onFocus
         , Events.onLoseFocus onBlur
         ]
-        { onChange = onInput Form.Checkbox
+        { onChange = onInput InputType.Checkbox
         , icon = Input.defaultCheckbox
         , label = Input.labelHidden ""
         , checked = state.value |> Maybe.withDefault False
@@ -52,7 +52,7 @@ radio attrs { options, label } { state, onFocus, onBlur, onInput } =
             :: attrs
         )
         { label = label
-        , onChange = onInput Form.Radio
+        , onChange = onInput InputType.Radio
         , options = options
         , selected = state.value
         }
@@ -88,8 +88,8 @@ dropdownSelect fielddef =
                 OnSelect item ->
                     ( state
                     , item
-                        |> Maybe.map (Builder.onInput fielddef Form.Select fieldstate)
-                        |> Maybe.withDefault (Builder.onEmpty Form.Select fieldstate)
+                        |> Maybe.map (Builder.onInput fielddef InputType.Select fieldstate)
+                        |> Maybe.withDefault (Builder.onEmpty InputType.Select fieldstate)
                         |> Just
                     , Effect.none
                     )
