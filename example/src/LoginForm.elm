@@ -1,7 +1,7 @@
 module LoginForm exposing (..)
 
 import Element
-import Form.Builder as Builder
+import Form
 import Form.Field as Field
 import Form.Validate as Validate
 import Widgets
@@ -15,15 +15,15 @@ type alias Credentials =
 
 
 type alias FormData =
-    Builder.Model String Credentials ()
+    Form.Model String Credentials ()
 
 
 type alias Msg =
-    Builder.Msg ()
+    Form.Msg ()
 
 
 form =
-    Builder.init
+    Form.init
         { validate =
             \_ login password rememberMe ->
                 Validate.succeed Credentials
@@ -42,13 +42,13 @@ form =
                     , Widgets.checkbox rememberMe
                     ]
         }
-        |> Builder.field "login"
+        |> Form.field "login"
             (Field.text
                 |> Field.withInitialValue .login
             )
-        |> Builder.field "password"
+        |> Form.field "password"
             (Field.text
                 |> Field.withInitialValue .password
             )
-        |> Builder.field "remember-me" (Field.boolean |> Field.withInitialValue .rememberMe)
-        |> Builder.finalize
+        |> Form.field "remember-me" (Field.boolean |> Field.withInitialValue .rememberMe)
+        |> Form.finalize

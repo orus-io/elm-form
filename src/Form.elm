@@ -1,4 +1,4 @@
-module Form.Builder exposing (..)
+module Form exposing (..)
 
 import Effect exposing (Effect)
 import Form.Data as Data exposing (FieldState, getAnyAt, getField)
@@ -38,7 +38,7 @@ type alias Model customError output stackModel =
     }
 
 
-type alias FormDef customError output sharedMsg model view stackModel stackMsg =
+type alias Form customError output sharedMsg model view stackModel stackMsg =
     { init : model -> Maybe output -> ( Model customError output stackModel, Effect sharedMsg (Msg stackMsg) )
     , update : model -> Msg stackMsg -> Model customError output stackModel -> ( Model customError output stackModel, Effect sharedMsg (Msg stackMsg) )
     , subscriptions : model -> Model customError output stackModel -> Sub (Msg stackMsg)
@@ -475,7 +475,7 @@ groupList name getGroupListData (Builder groupBuilder) (Builder builder) =
 
 finalize :
     Builder (model -> Validation customError output) view model customError sharedMsg output stackModel stackMsg stackMsg
-    -> FormDef customError output sharedMsg model view stackModel stackMsg
+    -> Form customError output sharedMsg model view stackModel stackMsg
 finalize (Builder { validate, view, load, stack }) =
     { init =
         \model initial ->

@@ -4,7 +4,7 @@ import Dropdown
 import Element exposing (Element)
 import Element.Input as Input
 import Enum exposing (Enum)
-import Form.Builder as Builder exposing (Builder)
+import Form
 import Form.Field as Field
 import Form.FieldStack
 import Form.Validate as Validate exposing (Validation)
@@ -18,7 +18,7 @@ type StreetKind
 
 
 type alias FormData =
-    Builder.Model String Address ( Dropdown.State StreetKind, () )
+    Form.Model String Address ( Dropdown.State StreetKind, () )
 
 
 type alias StackMsg =
@@ -26,7 +26,7 @@ type alias StackMsg =
 
 
 type alias Msg =
-    Builder.Msg StackMsg
+    Form.Msg StackMsg
 
 
 streetKindEnum : Enum StreetKind
@@ -60,9 +60,9 @@ type alias Address =
 
 
 group :
-    Builder
+    Form.Builder
         (model -> Validation customError Address)
-        (Element (Builder.Msg topStackMsg))
+        (Element (Form.Msg topStackMsg))
         model
         customError
         sharedMsg
@@ -71,7 +71,7 @@ group :
         StackMsg
         topStackMsg
 group =
-    Builder.init
+    Form.init
         { validate =
             \_ street_kind street zip_code city ->
                 Validate.succeed Address
@@ -102,12 +102,12 @@ group =
                         ]
                     ]
         }
-        |> Builder.fieldWithState "street_kind" (Field.custom streetKindEnum.toString streetKindEnum.fromString) Widgets.dropdownSelect
-        |> Builder.field "street" Field.text
-        |> Builder.field "zip_code" Field.text
-        |> Builder.field "city" Field.text
+        |> Form.fieldWithState "street_kind" (Field.custom streetKindEnum.toString streetKindEnum.fromString) Widgets.dropdownSelect
+        |> Form.field "street" Field.text
+        |> Form.field "zip_code" Field.text
+        |> Form.field "city" Field.text
 
 
 form =
     group
-        |> Builder.finalize
+        |> Form.finalize

@@ -6,12 +6,12 @@ import Element exposing (Attribute, Element)
 import Element.Events as Events
 import Element.Input as Input
 import Form.InputType as InputType
-import Form.Builder as Builder
+import Form
 import Form.Field
 import Form.FieldStack as FieldStack
 
 
-textInput : Builder.FieldViewState customError String stackMsg -> Element (Builder.Msg stackMsg)
+textInput : Form.FieldViewState customError String stackMsg -> Element (Form.Msg stackMsg)
 textInput { state, onInput, onFocus, onBlur } =
     Input.text
         [ Events.onFocus onFocus
@@ -24,7 +24,7 @@ textInput { state, onInput, onFocus, onBlur } =
         }
 
 
-checkbox : Builder.FieldViewState customError Bool stackMsg -> Element (Builder.Msg stackMsg)
+checkbox : Form.FieldViewState customError Bool stackMsg -> Element (Form.Msg stackMsg)
 checkbox { state, onFocus, onBlur, onInput } =
     Input.checkbox
         [ Events.onFocus onFocus
@@ -38,13 +38,13 @@ checkbox { state, onFocus, onBlur, onInput } =
 
 
 radio :
-    List (Attribute (Builder.Msg stackMsg))
+    List (Attribute (Form.Msg stackMsg))
     ->
-        { options : List (Input.Option value (Builder.Msg stackMsg))
-        , label : Input.Label (Builder.Msg stackMsg)
+        { options : List (Input.Option value (Form.Msg stackMsg))
+        , label : Input.Label (Form.Msg stackMsg)
         }
-    -> Builder.FieldViewState customError value stackMsg
-    -> Element (Builder.Msg stackMsg)
+    -> Form.FieldViewState customError value stackMsg
+    -> Element (Form.Msg stackMsg)
 radio attrs { options, label } { state, onFocus, onBlur, onInput } =
     Input.radio
         (Events.onFocus onFocus
@@ -88,8 +88,8 @@ dropdownSelect fielddef =
                 OnSelect item ->
                     ( state
                     , item
-                        |> Maybe.map (Builder.onInput fielddef InputType.Select fieldstate)
-                        |> Maybe.withDefault (Builder.onEmpty InputType.Select fieldstate)
+                        |> Maybe.map (Form.onInput fielddef InputType.Select fieldstate)
+                        |> Maybe.withDefault (Form.onEmpty InputType.Select fieldstate)
                         |> Just
                     , Effect.none
                     )
@@ -105,16 +105,16 @@ dropdownSelect fielddef =
 
 dropdownSelectView :
     { options : List item
-    , itemToPrompt : item -> Element (Builder.Msg stackMsg)
-    , itemToElement : Bool -> Bool -> item -> Element (Builder.Msg stackMsg)
+    , itemToPrompt : item -> Element (Form.Msg stackMsg)
+    , itemToElement : Bool -> Bool -> item -> Element (Form.Msg stackMsg)
     , dropdownOptions :
         List
-            (Dropdown.Config item (Builder.Msg stackMsg) ( Maybe item, List item )
-             -> Dropdown.Config item (Builder.Msg stackMsg) ( Maybe item, List item )
+            (Dropdown.Config item (Form.Msg stackMsg) ( Maybe item, List item )
+             -> Dropdown.Config item (Form.Msg stackMsg) ( Maybe item, List item )
             )
     }
-    -> Builder.FieldComponentViewState customError item stackMsg (Dropdown.State item) (DropdownMsg item)
-    -> Element (Builder.Msg stackMsg)
+    -> Form.FieldComponentViewState customError item stackMsg (Dropdown.State item) (DropdownMsg item)
+    -> Element (Form.Msg stackMsg)
 dropdownSelectView { options, itemToPrompt, itemToElement, dropdownOptions } { state, model, onFocus, onBlur, onInput, onEmpty, toMsg } =
     let
         config =

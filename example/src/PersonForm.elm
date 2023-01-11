@@ -5,7 +5,7 @@ import Dropdown
 import Element exposing (Element)
 import Element.Input as Input
 import Enum exposing (Enum)
-import Form.Builder as Builder
+import Form
 import Form.Field as Field
 import Form.FieldStack
 import Form.Validate as Validate
@@ -76,11 +76,11 @@ type alias StackMsg =
 
 
 type alias Msg =
-    Builder.Msg StackMsg
+    Form.Msg StackMsg
 
 
 type alias FormData =
-    Builder.Model
+    Form.Model
         String
         Person
         ( List (Dropdown.State Role)
@@ -89,7 +89,7 @@ type alias FormData =
 
 
 form =
-    Builder.init
+    Form.init
         { validate =
             \_ firstname lastname address phoneNumbers roleList ->
                 Validate.succeed Person
@@ -154,9 +154,9 @@ form =
                         Element.none
                     ]
         }
-        |> Builder.field "firstname" Field.text
-        |> Builder.field "lastname" Field.text
-        |> Builder.groupList "addressList" .addressList AddressForm.group
-        |> Builder.list "phone" (Just .phoneNumbers) Field.text
-        |> Builder.listWithState "role" (Just .role) (Field.custom roleEnum.toString roleEnum.fromString) Widgets.dropdownSelect
-        |> Builder.finalize
+        |> Form.field "firstname" Field.text
+        |> Form.field "lastname" Field.text
+        |> Form.groupList "addressList" .addressList AddressForm.group
+        |> Form.list "phone" (Just .phoneNumbers) Field.text
+        |> Form.listWithState "role" (Just .role) (Field.custom roleEnum.toString roleEnum.fromString) Widgets.dropdownSelect
+        |> Form.finalize
