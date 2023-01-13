@@ -3,7 +3,7 @@ module LoginForm exposing (..)
 import Element
 import Form
 import Form.Field as Field
-import Form.Validate as Validate
+import Form.Validation as Validation
 import Widgets
 
 
@@ -26,10 +26,10 @@ form =
     Form.init
         { validate =
             \_ login password rememberMe ->
-                Validate.succeed Credentials
-                    |> Validate.andMap login.valid
-                    |> Validate.andMap password.valid
-                    |> Validate.andMap rememberMe.valid
+                Validation.succeed Credentials
+                    |> Validation.andMap login
+                    |> Validation.andMap password
+                    |> Validation.andMap rememberMe
         , view =
             \model login password rememberMe ->
                 Element.column

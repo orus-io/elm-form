@@ -1,16 +1,14 @@
-
 module Form.Data exposing (..)
 
 import Dict exposing (Dict)
-import Form.InputType as InputType exposing(InputType)
-import Form.Error as Error exposing (Error, ErrorValue)
+import Form.Error as Error exposing (Error)
 import Form.Field as Field exposing (Field, FieldDef(..), FieldValue)
+import Form.InputType as InputType exposing (InputType)
 import Form.Tree as Tree
-import Form.Validate exposing (Validation)
 import Set exposing (Set)
 
 
-getAnyAt : (Field -> Maybe a) -> String -> Model e-> Maybe a
+getAnyAt : (Field -> Maybe a) -> String -> Model e -> Maybe a
 getAnyAt toFieldValue name model =
     getFieldAt name model |> Maybe.andThen toFieldValue
 
@@ -34,13 +32,17 @@ type alias Model customError =
     , changedFields : Set String
     , originalValues : Dict String (Maybe FieldValue)
     , isSubmitted : Bool
-    , errors : Error customError
+    , errors : List ( String, List customError )
     }
+
+
+type alias Validation customError output =
+    Model customError -> Result (List ( String, List customError )) output
 
 
 {-| Initial form state. See `Form.Field` for initial fields, and `Form.Validate` for validation.
 -}
-initial : List ( String, Field ) -> Validation e output -> (Model e, Maybe (Maybe output))
+initial : List ( String, Field ) -> Validation e output -> ( Model e, Maybe (Maybe output) )
 initial initialFields validation =
     let
         model =
@@ -50,7 +52,7 @@ initial initialFields validation =
             , changedFields = Set.empty
             , originalValues = Dict.empty
             , isSubmitted = False
-            , errors = Tree.group []
+            , errors = []
             }
     in
     updateValidateToForm validation model
@@ -72,8 +74,8 @@ can be retrived with `Form.getFieldAsString` or `Form.getFieldAsBool`.
 type alias FieldState e a =
     { path : String
     , value : Maybe a
-    , error : Maybe (ErrorValue e)
-    , liveError : Maybe (ErrorValue e)
+    , error : List e
+    , liveError : List e
     , isDirty : Bool
     , isChanged : Bool
     , hasFocus : Bool
@@ -82,24 +84,24 @@ type alias FieldState e a =
 
 {-| Get field state at path, with value as a `String`.
 -}
-getFieldAsString : String -> Model e-> FieldState e String
+getFieldAsString : String -> Model e -> FieldState e String
 getFieldAsString =
     getField getStringAt
 
 
 {-| Get field state at path, with value as a `Bool`.
 -}
-getFieldAsBool : String -> Model e-> FieldState e Bool
+getFieldAsBool : String -> Model e -> FieldState e Bool
 getFieldAsBool =
     getField getBoolAt
 
 
-getFieldAs : (Field -> Maybe a) -> String -> Model e-> FieldState e a
+getFieldAs : (Field -> Maybe a) -> String -> Model e -> FieldState e a
 getFieldAs fromField =
     getField (getAnyAt fromField)
 
 
-getField : (String -> Model e-> Maybe a) -> String -> Model e-> FieldState e a
+getField : (String -> Model e -> Maybe a) -> String -> Model e -> FieldState e a
 getField getValue path form =
     { path = path
     , value = getValue path form
@@ -113,7 +115,7 @@ getField getValue path form =
 
 {-| return a list of indexes so one can build qualified names of fields in list.
 -}
-getListIndexes : String -> Model e-> List Int
+getListIndexes : String -> Model e -> List Int
 getListIndexes path model =
     let
         length =
@@ -138,21 +140,20 @@ type Msg
     | Reset (List ( String, Field ))
 
 
-
 {-| Update form state with the given message
 -}
-update : Validation e output -> Msg -> Model e -> (Model e, Maybe (Maybe output))
-update validation msg model  =
+update : Validation e output -> Msg -> Model e -> ( Model e, Maybe (Maybe output) )
+update validation msg model =
     case msg of
         NoOp ->
-            ( model , Nothing)
+            ( model, Nothing )
 
         Focus name ->
             let
                 newModel =
                     { model | focus = Just name }
             in
-            ( newModel, Nothing)
+            ( newModel, Nothing )
 
         Blur name ->
             let
@@ -162,7 +163,7 @@ update validation msg model  =
                 newModel =
                     { model | focus = Nothing, dirtyFields = newDirtyFields }
             in
-            (updateValidateToForm validation newModel)
+            updateValidateToForm validation newModel
 
         Input name inputType fieldValue ->
             let
@@ -237,7 +238,7 @@ update validation msg model  =
                         , originalValues = newOriginalValues
                     }
             in
-            (updateValidateToForm validation newModel)
+            updateValidateToForm validation newModel
 
         Append listName ->
             let
@@ -254,7 +255,7 @@ update validation msg model  =
                         | fields = setFieldAt listName (Tree.List newListFields) model
                     }
             in
-            ( newModel, Nothing)
+            ( newModel, Nothing )
 
         RemoveItem listName index ->
             let
@@ -282,17 +283,17 @@ update validation msg model  =
                         , originalValues = filterOriginalValue model.originalValues
                     }
             in
-            (updateValidateToForm validation newModel)
+            updateValidateToForm validation newModel
 
         Submit ->
             let
-                (validatedModel, validatedOutput) =
+                ( validatedModel, validatedOutput ) =
                     updateValidateToForm validation model
             in
-            ( { validatedModel | isSubmitted = True }, validatedOutput)
+            ( { validatedModel | isSubmitted = True }, validatedOutput )
 
         Validate ->
-            (updateValidateToForm validation model)
+            updateValidateToForm validation model
 
         Reset fields ->
             let
@@ -305,30 +306,32 @@ update validation msg model  =
                         , isSubmitted = False
                     }
             in
-            (updateValidateToForm validation newModel)
+            updateValidateToForm validation newModel
 
 
-updateValidateToForm : Validation e o -> Model e  -> (Model e, Maybe (Maybe o))
+updateValidateToForm : Validation e o -> Model e -> ( Model e, Maybe (Maybe o) )
 updateValidateToForm validation model =
     updateValidate validation model
-    |> Tuple.mapSecond Just
+        |> Tuple.mapSecond Just
 
 
-
-updateValidate : Validation e o -> Model e  -> (Model e, Maybe o)
+updateValidate : Validation e o -> Model e -> ( Model e, Maybe o )
 updateValidate validation model =
-    case validation model.fields of
+    case validation model of
         Ok output ->
-            ({ model
-                | errors =
-                    Tree.group []
-                    }, Just output)
+            ( { model
+                | errors = []
+              }
+            , Just output
+            )
 
-        Err error ->
-            ({ model
+        Err errors ->
+            ( { model
                 | errors =
-                    error
-                    }, Nothing)
+                    errors
+              }
+            , Nothing
+            )
 
 
 getFieldAt : String -> Model e -> Maybe Field
@@ -336,12 +339,12 @@ getFieldAt qualifiedName model =
     Tree.getAtPath qualifiedName model.fields
 
 
-getStringAt : String -> Model e-> Maybe String
+getStringAt : String -> Model e -> Maybe String
 getStringAt name model =
     getFieldAt name model |> Maybe.andThen Field.asString
 
 
-getBoolAt : String -> Model e-> Maybe Bool
+getBoolAt : String -> Model e -> Maybe Bool
 getBoolAt name model =
     getFieldAt name model |> Maybe.andThen Field.asBool
 
@@ -353,51 +356,68 @@ setFieldAt path field_ model =
 
 {-| Get form submission state. Useful to show errors on unchanged fields.
 -}
-isSubmitted : Model e-> Bool
+isSubmitted : Model e -> Bool
 isSubmitted model =
     model.isSubmitted
 
 
+mergeErrorList : List ( String, e ) -> List ( String, List e )
+mergeErrorList =
+    List.foldl
+        (\( key, err ) out ->
+            case List.filter (Tuple.first >> (==) key) out |> List.head of
+                Just ( _, errs ) ->
+                    ( key, err :: errs ) :: out
+
+                Nothing ->
+                    ( key, [ err ] ) :: out
+        )
+        []
+
+
 {-| Get list of errors on qualified paths.
 -}
-getErrors : Model e-> List ( String, Error.ErrorValue e )
-getErrors model =
-    Tree.valuesWithPath model.errors
+getErrors : Model e -> List ( String, List e )
+getErrors { errors } =
+    errors
 
 
-getErrorAt : String -> Model e-> Maybe (ErrorValue e)
-getErrorAt path model =
-    Tree.getAtPath path model.errors |> Maybe.andThen Tree.asValue
+getErrorAt : String -> Model e -> List e
+getErrorAt path { errors } =
+    List.filter (Tuple.first >> (==) path) errors
+        |> List.head
+        |> Maybe.map Tuple.second
+        |> Maybe.withDefault []
 
 
-getLiveErrorAt : String -> Model e-> Maybe (ErrorValue e)
+getLiveErrorAt : String -> Model e -> List e
 getLiveErrorAt name form =
     if isSubmitted form || (isChangedAt name form && not (isDirtyAt name form)) then
         getErrorAt name form
 
     else
-        Nothing
+        []
 
 
-isChangedAt : String -> Model e-> Bool
+isChangedAt : String -> Model e -> Bool
 isChangedAt qualifiedName model =
     Set.member qualifiedName model.changedFields
 
 
-isDirtyAt : String -> Model e-> Bool
+isDirtyAt : String -> Model e -> Bool
 isDirtyAt qualifiedName model =
     Set.member qualifiedName model.dirtyFields
 
 
 {-| Return currently focused field, if any.
 -}
-getFocus : Model e-> Maybe String
+getFocus : Model e -> Maybe String
 getFocus model =
     model.focus
 
 
 {-| Get set of changed fields.
 -}
-getChangedFields : Model e-> Set String
+getChangedFields : Model e -> Set String
 getChangedFields model =
     model.changedFields

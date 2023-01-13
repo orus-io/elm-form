@@ -7,7 +7,7 @@ import Enum exposing (Enum)
 import Form
 import Form.Field as Field
 import Form.FieldStack
-import Form.Validate as Validate exposing (Validation)
+import Form.Validation as Validation exposing (Validation)
 import Widgets
 
 
@@ -61,7 +61,7 @@ type alias Address =
 
 group :
     Form.Builder
-        (model -> Validation customError Address)
+        (Validation customError Never Address)
         (Element (Form.Msg topStackMsg))
         model
         customError
@@ -74,11 +74,11 @@ group =
     Form.init
         { validate =
             \_ street_kind street zip_code city ->
-                Validate.succeed Address
-                    |> Validate.andMap street_kind.valid
-                    |> Validate.andMap street.valid
-                    |> Validate.andMap zip_code.valid
-                    |> Validate.andMap city.valid
+                Validation.succeed Address
+                    |> Validation.andMap street_kind
+                    |> Validation.andMap street
+                    |> Validation.andMap zip_code
+                    |> Validation.andMap city
         , view =
             \_ street_kind street zip_code city ->
                 Element.column

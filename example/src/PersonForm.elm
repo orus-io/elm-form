@@ -8,7 +8,7 @@ import Enum exposing (Enum)
 import Form
 import Form.Field as Field
 import Form.FieldStack
-import Form.Validate as Validate
+import Form.Validation as Validation
 import Widgets
 
 
@@ -92,12 +92,12 @@ form =
     Form.init
         { validate =
             \_ firstname lastname address phoneNumbers roleList ->
-                Validate.succeed Person
-                    |> Validate.andMap firstname.valid
-                    |> Validate.andMap lastname.valid
-                    |> Validate.andMap address
-                    |> Validate.andMap phoneNumbers.valid
-                    |> Validate.andMap roleList.valid
+                Validation.succeed Person
+                    |> Validation.andMap firstname
+                    |> Validation.andMap lastname
+                    |> Validation.andMap address
+                    |> Validation.andMap phoneNumbers
+                    |> Validation.andMap roleList
         , view =
             \_ firstname lastname address phoneNumbers roleList ->
                 Element.column

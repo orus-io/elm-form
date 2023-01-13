@@ -1,4 +1,4 @@
-module Form.Error exposing (Error, ErrorValue(..), value)
+module Form.Error exposing (Error, value)
 
 {-| Validation errors.
 
@@ -12,31 +12,12 @@ import Form.Tree as Tree exposing (Tree)
 {-| Tree of errors.
 -}
 type alias Error e =
-    Tree (ErrorValue e)
-
-
-{-| A validation error. See `Form.Validate.customError` for `CustomError` building.
--}
-type ErrorValue e
-    = Empty
-    | InvalidString
-    | InvalidEmail
-    | InvalidFormat
-    | InvalidInt
-    | InvalidFloat
-    | InvalidBool
-    | SmallerIntThan Int
-    | GreaterIntThan Int
-    | SmallerFloatThan Float
-    | GreaterFloatThan Float
-    | ShorterStringThan Int
-    | LongerStringThan Int
-    | NotIncludedIn
-    | CustomError e
+    Tree (List e)
 
 
 {-| Build a tree node (a leaf) for this error
 -}
-value : ErrorValue a -> Error a
+value : a -> Error a
 value =
-    Tree.Value
+    List.singleton
+        >> Tree.Value
