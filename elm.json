@@ -7,10 +7,8 @@
     "exposed-modules": [
         "Enum",
         "Form",
-        "Form.Data",
         "Form.Error",
         "Form.Field",
-        "Form.FieldState",
         "Form.InputType",
         "Form.Validate"
     ],

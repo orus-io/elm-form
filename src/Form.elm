@@ -1,19 +1,53 @@
-module Form exposing (..)
+module Form exposing
+    ( Msg, Model, Form
+    , Builder, init, field, fieldWithState, list, listWithState, group, groupList, finalize
+    , FieldViewState, FieldListViewState, FieldListItemViewState, FieldComponentViewState, FieldComponentListViewState, FieldComponentListItemViewState, GroupListView
+    )
+
+{-|
+
+
+# Form
+
+@docs Msg, Model, Form
+
+
+# Building a form
+
+@docs Builder, init, field, fieldWithState, list, listWithState, group, groupList, finalize
+
+
+# View arguments
+
+@docs FieldViewState, FieldListViewState, FieldListItemViewState, FieldComponentViewState, FieldComponentListViewState, FieldComponentListItemViewState, GroupListView
+
+-}
 
 import Effect exposing (Effect)
 import Form.Data as Data exposing (FieldState, getAnyAt, getField)
-import Form.InputType as InputType exposing (InputType)
 import Form.Error as Error
 import Form.Field as Field exposing (Field, FieldDef(..))
 import Form.FieldStack as FieldStack exposing (Stack)
+import Form.InputType as InputType exposing (InputType)
 import Form.Internal as Internal
 import Form.Validate as Validate exposing (Validation)
 import List.Extra as List
 
 
+{-| Form Msg
+-}
 type Msg stackMsg
     = DataMsg Data.Msg
     | StackMsg stackMsg
+
+
+{-| Form model
+-}
+type alias Model customError output stackModel =
+    { formData : Data.Model customError
+    , output : Maybe output
+    , stack : stackModel
+    }
 
 
 type alias BuilderModel customError stackModel =
@@ -22,6 +56,8 @@ type alias BuilderModel customError stackModel =
     }
 
 
+{-| Intermediate type for building forms
+-}
 type Builder validate view model customError sharedMsg output stackModel stackMsg topStackMsg
     = Builder
         { load : List (output -> ( String, Field ))
@@ -31,13 +67,8 @@ type Builder validate view model customError sharedMsg output stackModel stackMs
         }
 
 
-type alias Model customError output stackModel =
-    { formData : Data.Model customError
-    , output: Maybe output
-    , stack : stackModel
-    }
-
-
+{-| A form
+-}
 type alias Form customError output sharedMsg model view stackModel stackMsg =
     { init : model -> Maybe output -> ( Model customError output stackModel, Effect sharedMsg (Msg stackMsg) )
     , update : model -> Msg stackMsg -> Model customError output stackModel -> ( Model customError output stackModel, Effect sharedMsg (Msg stackMsg) )
@@ -56,6 +87,8 @@ onEmpty inputType { path } =
     Data.Input path inputType Field.EmptyField
 
 
+{-| ViewState of a field passed to view function
+-}
 type alias FieldViewState customError a stackMsg =
     { state : FieldState customError a
     , onInput : InputType -> a -> Msg stackMsg
@@ -65,18 +98,24 @@ type alias FieldViewState customError a stackMsg =
     }
 
 
+{-| ViewState of a list of fields passed to view function
+-}
 type alias FieldListViewState customError a stackMsg =
     { onAppend : Msg stackMsg
     , items : List (FieldListItemViewState customError a stackMsg)
     }
 
 
+{-| ViewState of a list of fields item passed to view function
+-}
 type alias FieldListItemViewState customError a stackMsg =
     { viewstate : FieldViewState customError a stackMsg
     , onRemove : Msg stackMsg
     }
 
 
+{-| ViewState of a component (ie a field with state) passed to view function
+-}
 type alias FieldComponentViewState customError a stackMsg componentModel componentMsg =
     { state : FieldState customError a
     , model : componentModel
@@ -88,12 +127,16 @@ type alias FieldComponentViewState customError a stackMsg componentModel compone
     }
 
 
+{-| ViewState of a component list passed to view function
+-}
 type alias FieldComponentListViewState customError a stackMsg componentModel compomentMsg =
     { onAppend : Msg stackMsg
     , items : List (FieldComponentListItemViewState customError a stackMsg componentModel compomentMsg)
     }
 
 
+{-| ViewState of a component list item passed to view function
+-}
 type alias FieldComponentListItemViewState customError a stackMsg componentModel compomentMsg =
     { viewstate : FieldComponentViewState customError a stackMsg componentModel compomentMsg
     , onRemove : Msg stackMsg
@@ -115,6 +158,8 @@ type alias FieldListValidate customError a =
     }
 
 
+{-| Group list view, passed to the view function
+-}
 type alias GroupListView view stackMsg =
     { onAppend : Msg stackMsg
     , items : List view
@@ -164,6 +209,8 @@ andThen filter fieldv =
         )
 
 
+{-| Initialize a new form builder
+-}
 init :
     { validate : model -> validate, view : model -> view }
     -> Builder (model -> validate) view model customError sharedMsg output () () topStackMsg
@@ -176,6 +223,8 @@ init { validate, view } =
         }
 
 
+{-| Add a single stateless field to a form builder
+-}
 field :
     String
     -> FieldDef output a
@@ -213,6 +262,8 @@ field name (FieldDef fieldload toField fromField) (Builder { validate, view, loa
         }
 
 
+{-| Add a single statefull field to a form builder
+-}
 fieldWithState :
     String
     -> FieldDef output a
@@ -255,6 +306,8 @@ fieldWithState name (FieldDef fieldload toField fromField) component (Builder { 
         }
 
 
+{-| Add a list of stateless fields to a form builder
+-}
 list :
     String
     -> Maybe (output -> List a)
@@ -305,6 +358,8 @@ list name fieldlistload (FieldDef _ toField fromField) (Builder { validate, view
         }
 
 
+{-| Add a list of statefull fields to a form builder
+-}
 listWithState :
     String
     -> Maybe (output -> List a)
@@ -364,6 +419,8 @@ listWithState name fieldlistload (FieldDef fieldload toField fromField) componen
         }
 
 
+{-| Add a group of field (a Builder) to a form builder
+-}
 group :
     String
     -> (output -> groupOutput)
@@ -411,6 +468,8 @@ group name getGroupData (Builder groupBuilder) (Builder builder) =
         }
 
 
+{-| Add a list of groups to a form builder
+-}
 groupList :
     String
     -> (output -> List groupOutput)
@@ -473,6 +532,8 @@ groupList name getGroupListData (Builder groupBuilder) (Builder builder) =
         }
 
 
+{-| finalize a Builder into a Form
+-}
 finalize :
     Builder (model -> Validation customError output) view model customError sharedMsg output stackModel stackMsg stackMsg
     -> Form customError output sharedMsg model view stackModel stackMsg
@@ -480,7 +541,7 @@ finalize (Builder { validate, view, load, stack }) =
     { init =
         \model initial ->
             let
-                (formData, output) =
+                ( formData, output ) =
                     Data.initial
                         (initial
                             |> Maybe.map (\data -> load |> List.map (\l -> l data))
@@ -517,14 +578,14 @@ finalize (Builder { validate, view, load, stack }) =
                         ( nextStack, maybeDataMsg, stackEffect ) =
                             stack.update "" state.formData stackMsg state.stack
 
-                        (nextData, nextOutput) =
+                        ( nextData, nextOutput ) =
                             case maybeDataMsg of
                                 Just formMsg ->
                                     Data.update (validate model) formMsg state.formData
-                                    |> Tuple.mapSecond (Maybe.withDefault state.output)
+                                        |> Tuple.mapSecond (Maybe.withDefault state.output)
 
                                 Nothing ->
-                                    (state.formData, state.output)
+                                    ( state.formData, state.output )
                     in
                     ( { stack = nextStack
                       , formData = nextData

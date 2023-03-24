@@ -1,5 +1,12 @@
 module Form.InputType exposing (InputType(..))
 
+{-|
+
+@docs InputType
+
+-}
+
+
 {-| Input types to determine live validation behaviour.
 -}
 type InputType
@@ -8,4 +15,3 @@ type InputType
     | Select
     | Radio
     | Checkbox
-
