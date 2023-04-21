@@ -2,6 +2,7 @@ module Form exposing
     ( Msg, Model, Form
     , Builder, init, field, fieldWithState, list, listWithState, group, groupList, finalize
     , FieldViewState, FieldListViewState, FieldListItemViewState, FieldComponentViewState, FieldComponentListViewState, FieldComponentListItemViewState, GroupListView
+    , onInput, onEmpty
     )
 
 {-|
@@ -20,6 +21,11 @@ module Form exposing
 # View arguments
 
 @docs FieldViewState, FieldListViewState, FieldListItemViewState, FieldComponentViewState, FieldComponentListViewState, FieldComponentListItemViewState, GroupListView
+
+
+# Stateful components helpers
+
+@docs onInput, onEmpty
 
 -}
 
