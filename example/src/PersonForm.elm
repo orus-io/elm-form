@@ -108,7 +108,13 @@ form =
                     [ Widgets.textInput firstname
                     , Widgets.textInput lastname
                     , Input.button [] { label = Element.text "add address", onPress = Just address.onAppend }
-                    , address.items |> Element.column []
+                    , address.items
+                        |> List.map
+                            (\{ view, onRemove } ->
+                                Element.row [ Element.spacing 30, Element.width Element.fill ]
+                                    [ view, Input.button [ Element.alignTop ] { onPress = Just onRemove, label = Element.text "X" } ]
+                            )
+                        |> Element.column []
                     , List.map
                         (\item ->
                             Element.row []

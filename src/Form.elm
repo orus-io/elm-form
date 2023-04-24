@@ -1,7 +1,7 @@
 module Form exposing
     ( Msg, Model, Form
     , Builder, init, field, fieldWithState, list, listWithState, group, groupList, finalize
-    , FieldViewState, FieldListViewState, FieldListItemViewState, FieldComponentViewState, FieldComponentListViewState, FieldComponentListItemViewState, GroupListView
+    , FieldViewState, FieldListViewState, FieldListItemViewState, FieldComponentViewState, FieldComponentListViewState, FieldComponentListItemViewState, GroupListItemView, GroupListView
     , onInput, onEmpty
     )
 
@@ -20,7 +20,7 @@ module Form exposing
 
 # View arguments
 
-@docs FieldViewState, FieldListViewState, FieldListItemViewState, FieldComponentViewState, FieldComponentListViewState, FieldComponentListItemViewState, GroupListView
+@docs FieldViewState, FieldListViewState, FieldListItemViewState, FieldComponentViewState, FieldComponentListViewState, FieldComponentListItemViewState, GroupListItemView, GroupListView
 
 
 # Stateful components helpers
@@ -83,11 +83,15 @@ type alias Form customError output sharedMsg model view stackModel stackMsg =
     }
 
 
+{-| onInput
+-}
 onInput : FieldDef output a -> InputType -> FieldState customError a -> a -> Data.Msg
 onInput (FieldDef _ toFieldValue _) inputType { path } value =
     Data.Input path inputType (toFieldValue value)
 
 
+{-| onEmpty
+-}
 onEmpty : InputType -> FieldState customError a -> Data.Msg
 onEmpty inputType { path } =
     Data.Input path inputType Field.EmptyField
@@ -164,11 +168,19 @@ type alias FieldListValidate customError a =
     }
 
 
+{-| Group list item view
+-}
+type alias GroupListItemView view stackMsg =
+    { view : view
+    , onRemove : Msg stackMsg
+    }
+
+
 {-| Group list view, passed to the view function
 -}
 type alias GroupListView view stackMsg =
     { onAppend : Msg stackMsg
-    , items : List view
+    , items : List (GroupListItemView view stackMsg)
     }
 
 
@@ -508,19 +520,22 @@ groupList name getGroupListData (Builder groupBuilder) (Builder builder) =
                         Data.getListIndexes (FieldStack.path path name) state.formData
                             |> List.map
                                 (\i ->
-                                    groupBuilder.view
-                                        (FieldStack.itempath path name i)
-                                        (Tuple.pair i >> FieldStack.CurrentMsg >> toStackMsg)
-                                        model
-                                        { formData = state.formData
-                                        , stack =
-                                            Tuple.first state.stack
-                                                |> List.getAt i
-                                                |> Maybe.withDefault
-                                                    (groupBuilder.stack.init (FieldStack.itempath path name i) state.formData
-                                                        |> Tuple.first
-                                                    )
-                                        }
+                                    { view =
+                                        groupBuilder.view
+                                            (FieldStack.itempath path name i)
+                                            (Tuple.pair i >> FieldStack.CurrentMsg >> toStackMsg)
+                                            model
+                                            { formData = state.formData
+                                            , stack =
+                                                Tuple.first state.stack
+                                                    |> List.getAt i
+                                                    |> Maybe.withDefault
+                                                        (groupBuilder.stack.init (FieldStack.itempath path name i) state.formData
+                                                            |> Tuple.first
+                                                        )
+                                            }
+                                    , onRemove = DataMsg <| Data.RemoveItem name i
+                                    }
                                 )
                 in
                 builder.view path
